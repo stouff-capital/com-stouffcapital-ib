@@ -1,0 +1,10 @@
+alembic
+Flask
+Flask-Migrate
+Flask-SQLAlchemy
+gunicorn
+mysql-connector-python
+python-dateutil
+python-dotenv
+requests
+SQLAlchemy
