@@ -1,8 +1,8 @@
-"""add tables: contract, execution, bbg
+"""init tables
 
-Revision ID: 123fdf497b3d
+Revision ID: e1396f83b5a7
 Revises: 
-Create Date: 2018-06-04 10:50:36.304025
+Create Date: 2018-06-04 16:50:09.024353
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '123fdf497b3d'
+revision = 'e1396f83b5a7'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -25,7 +25,7 @@ def upgrade():
     sa.Column('currency', sa.String(length=5), nullable=True),
     sa.Column('exchange', sa.String(length=25), nullable=True),
     sa.Column('primaryExchange', sa.String(length=25), nullable=True),
-    sa.Column('lastTradeDateOrcontractMonth', sa.String(length=15), nullable=True),
+    sa.Column('lastTradeDateOrContractMonth', sa.String(length=15), nullable=True),
     sa.Column('multiplier', sa.Numeric(precision=10, scale=4), nullable=True),
     sa.Column('strike', sa.Numeric(precision=10, scale=4), nullable=True),
     sa.Column('right', sa.String(length=25), nullable=True),

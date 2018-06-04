@@ -14,7 +14,7 @@ class Contract(db.Model):
     currency = db.Column(db.String(5))
     exchange = db.Column(db.String(25))
     primaryExchange = db.Column(db.String(25), nullable=True)
-    lastTradeDateOrcontractMonth = db.Column(db.String(15), nullable=True)
+    lastTradeDateOrContractMonth = db.Column(db.String(15), nullable=True)
     multiplier = db.Column(db.Numeric(10, 4), nullable=True)
     strike = db.Column(db.Numeric(10, 4), nullable=True)
     right = db.Column(db.String(25), nullable=True) # put / call

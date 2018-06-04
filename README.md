@@ -1,10 +1,10 @@
 # ib webservice
 
 ## set .env file
-- SECRET_KEY
-- DATABASE_URL="mysql+mysqlconnector://ibuser:<password>@localhost/ibdb"
-- BASIC_AUTH_USERNAME=<authUser>
-- BASIC_AUTH_PASSWORD=<authPassword>
+- `SECRET_KEY`
+- `DATABASE_URL="mysql+mysqlconnector://ibuser:<password>@localhost/ibdb"`
+- `BASIC_AUTH_USERNAME=<authUser>`
+- `BASIC_AUTH_PASSWORD=<authPassword>`
 
 ## mysql db
 `docker run --name ibmysql -e MYSQL_RANDOM_ROOT_PASSWORD=yes -e MYSQL_DATABASE=ibdb -e MYSQL_USER=ibuser -e MYSQL_PASSWORD=<password> -p 3306:3306 -d mysql:5.6`
@@ -22,3 +22,37 @@
 `flask db migrate -m "init tables"`
 
 `flask db upgrade`
+
+
+## VBA post
+
+```
+Public Function upload_exec(oExec As WebDictionary)
+
+Dim Auth As New HttpBasicAuthenticator
+Auth.Setup _
+    Username:="<user>", _
+    Password:="<password>"
+
+Dim esClient As WebClient
+Set esClient = New WebClient
+esClient.BaseUrl = "<host>"
+Set esClient.Authenticator = Auth
+
+
+Dim esRequest As WebRequest
+Dim esResponse As WebResponse
+
+
+Set esRequest = New WebRequest
+    esRequest.Resource = "/executions"
+    esRequest.Method = WebMethod.HttpPost
+    esRequest.Format = json
+    Set esRequest.Body = oExec
+
+
+Set esResponse = esClient.Execute(esRequest)
+'Debug.Print esResponse.Content
+
+End Function
+```

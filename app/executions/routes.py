@@ -48,7 +48,7 @@ def create():
             currency=data['currency'],
             exchange=data['exchange'],
             primaryExchange=data['primaryExchange'],
-            lastTradeDateOrcontractMonth=data['lastTradeDateOrcontractMonth'],
+            lastTradeDateOrContractMonth=data['lastTradeDateOrContractMonth'], #datetime
             multiplier=data['multiplier'],
             strike=data['strike'],
             right=data['right']
@@ -77,11 +77,12 @@ def create():
             execId=data['execId'],
             orderId=data['orderId'],
             asset=contract, # object
-            # time=data['orderId'],
+            time=datetime.strptime( data['time'], '%Y%m%d  %H:%M:%S'), # 20180604  13:32:52
             acctNumber=data['acctNumber'],
             exchange=data['exchange'],
             side=data['side'],
             shares=shares,
+            cumQty=cumQty,
             price=data['price'],
             avgPrice=data['avgPrice'],
             permId=data['permId']
@@ -93,7 +94,7 @@ def create():
 
     return jsonify( {
             'status': 'ok',
-            'data': data,
+            'inputData': data,
             'contract': {'localSymbol': contract.localSymbol},
             'order': {'orderId': execution.orderId},
             'execution': {'execId': execution.execId}
