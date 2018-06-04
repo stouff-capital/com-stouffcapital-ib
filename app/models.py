@@ -19,14 +19,29 @@ class Contract(db.Model):
     strike = db.Column(db.Numeric(10, 4), nullable=True)
     right = db.Column(db.String(25), nullable=True) # put / call
 
+    executions = db.relationship('Execution', backref='asset', lazy='dynamic')
+
+    bbg = db.relationship("Bbg", uselist=False, back_populates="contract")
+
     def __repr__(self):
         return '<Contract {}>'.format(self.localSymbol)
+
+class Bbg(db.Model):
+    ticker = db.Column(db.String(75))
+
+    contract_localSymbol = db.Column(db.String(75), db.ForeignKey('contract.localSymbol'), primary_key=True)
+    contract = db.relationship("Contract", back_populates="bbg")
+
+    def __repr__(self):
+        return '<Bbg {} - {}>'.format(self.contract_localSymbol, self.ticker)
 
 
 class Execution(db.Model):
     execId = db.Column(db.String(140), primary_key=True)
     orderId = db.Column(db.BigInteger)
+
     contract_localSymbol = db.Column(db.String(75), db.ForeignKey('contract.localSymbol'))
+
     time = db.Column(db.DateTime)
     acctNumber = db.Column(db.String(25))
     exchange = db.Column(db.String(25))

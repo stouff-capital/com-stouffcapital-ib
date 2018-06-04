@@ -1,9 +1,10 @@
 # ib webservice
 
 ## set .env file
-
 - SECRET_KEY
 - DATABASE_URL="mysql+mysqlconnector://ibuser:<password>@localhost/ibdb"
+- BASIC_AUTH_USERNAME=<authUser>
+- BASIC_AUTH_PASSWORD=<authPassword>
 
 ## mysql db
 `docker run --name ibmysql -e MYSQL_RANDOM_ROOT_PASSWORD=yes -e MYSQL_DATABASE=ibdb -e MYSQL_USER=ibuser -e MYSQL_PASSWORD=<password> -p 3306:3306 -d mysql:5.6`
