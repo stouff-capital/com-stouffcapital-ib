@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ib-mysql
+  labels:
+    app: ib
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: ib
+    tier: mysql
+  clusterIP: None
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ib-mysql-pv-claim
+  labels:
+    app: ib
+spec:
+  storageClassName: rook-ceph-block
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: ib-mysql
+  labels:
+    app: ib
+spec:
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: ib
+        tier: mysql
+    spec:
+      containers:
+      - image: mysql:5.6
+        name: ib-mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: changeme
+        - name: MYSQL_DATABASE
+          value: ibdb
+        - name: MYSQL_USER
+          value: ibuser
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ib
+              key: mysql-password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: ib-mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: ib-mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: ib-mysql-pv-claim
