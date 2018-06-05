@@ -5,7 +5,7 @@ RUN adduser -D ib
 WORKDIR /home/ib
 
 COPY requirements.txt requirements.txt
-RUN /pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 COPY app app
 COPY migrations migrations
