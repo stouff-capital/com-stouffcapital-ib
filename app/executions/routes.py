@@ -12,6 +12,12 @@ def index():
 
 @bp.route('/executions', methods=['GET'])
 def list():
+    executions = Execution.query.all()
+    for exec in executions:
+        current_app.logger.info(exec.contract.localSymbol)
+        bbg = exec.contract.bbg
+        if bbg != None:
+            current_app.logger.info(exec.contract.bbg.ticker)
     return jsonify( {'status': 'ok'} )
 
 

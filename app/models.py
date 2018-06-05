@@ -41,6 +41,7 @@ class Execution(db.Model):
     orderId = db.Column(db.BigInteger)
 
     contract_localSymbol = db.Column(db.String(75), db.ForeignKey('contract.localSymbol'))
+    contract = db.relationship("Contract", back_populates="executions")
 
     time = db.Column(db.DateTime)
     acctNumber = db.Column(db.String(25))

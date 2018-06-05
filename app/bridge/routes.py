@@ -29,7 +29,6 @@ def create():
     if data == None:
         return jsonify( {'status': 'error', 'error': 'missing data'} )
 
-
     contract = Contract.query.get(data['localSymbol'])
     if contract != None:
         current_app.logger.info('bridge:: existing contract')
@@ -48,7 +47,7 @@ def create():
             db.session.commit()
             current_app.logger.info('new bridge')
 
-            return jsonify( {'status': 'ok'} )
+            return jsonify( {'status': 'ok', 'inputData': data} )
     else:
         current_app.logger.info('bridge:: missing contract')
         return jsonify( {'status': 'error', 'error': 'missing contract'} )
