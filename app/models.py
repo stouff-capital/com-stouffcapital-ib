@@ -5,6 +5,8 @@ from flask import current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 
+from sqlalchemy.dialects.mysql import DOUBLE, TINYBLOB, TINYINT
+
 
 class Contract(db.Model):
     # secId = db.Column(db.String(75) ) # doesn't seem to be used
@@ -15,8 +17,8 @@ class Contract(db.Model):
     exchange = db.Column(db.String(25))
     primaryExchange = db.Column(db.String(25), nullable=True)
     lastTradeDateOrContractMonth = db.Column(db.String(15), nullable=True)
-    multiplier = db.Column(db.Numeric(10, 4), nullable=True)
-    strike = db.Column(db.Numeric(10, 4), nullable=True)
+    multiplier = db.Column(db.Numeric(15, 6), nullable=True)
+    strike = db.Column(db.Numeric(15, 6), nullable=True)
     right = db.Column(db.String(25), nullable=True) # put / call
 
     executions = db.relationship('Execution', backref='asset', lazy='dynamic')
@@ -49,8 +51,10 @@ class Execution(db.Model):
     side = db.Column(db.String(15))
     shares = db.Column(db.BigInteger) # execQty
     cumQty = db.Column(db.BigInteger)
-    price = db.Column(db.Numeric(10, 6))
-    avgPrice = db.Column(db.Numeric(10, 6))
+    #price = db.Column(DOUBLE(asdecimal=True))
+    #avgPrice = db.Column(DOUBLE(asdecimal=True))
+    price = db.Column(db.Numeric(15, 6))
+    avgPrice = db.Column(db.Numeric(15, 6))
     permId = db.Column(db.BigInteger)
 
 
