@@ -12,20 +12,6 @@ spec:
     tier: mysql
   clusterIP: None
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: ib-mysql-pv-claim
-  labels:
-    app: ib
-spec:
-  storageClassName: rook-ceph-block
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
----
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
