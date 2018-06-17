@@ -47,6 +47,16 @@ def create():
         else:
             localSymbol=data['localSymbol']
 
+        if data['strike'] > 0:
+            strike = data['strike']
+        else:
+            strike = None
+
+        if data['right'] != '':
+            right = data['right']
+        else:
+            right = None
+
         contract = Contract(
             secType=data['secType'],
             localSymbol=localSymbol,
@@ -56,8 +66,8 @@ def create():
             primaryExchange=data['primaryExchange'],
             lastTradeDateOrContractMonth=data['lastTradeDateOrContractMonth'], #datetime
             multiplier=data['multiplier'],
-            strike=data['strike'],
-            right=data['right']
+            strike=strike,
+            right=right
         )
         db.session.add(contract)
         db.session.commit()

@@ -5,6 +5,7 @@ Flask-Migrate
 Flask-SQLAlchemy
 gunicorn
 mysql-connector-python
+pandas
 python-dateutil
 python-dotenv
 requests
