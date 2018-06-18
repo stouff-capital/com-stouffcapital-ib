@@ -7,11 +7,15 @@
 - `BASIC_AUTH_PASSWORD=<authPassword>`
 
 ## mysql db
-`docker run --name ibmysql -e MYSQL_RANDOM_ROOT_PASSWORD=yes -e MYSQL_DATABASE=ibdb -e MYSQL_USER=ibuser -e MYSQL_PASSWORD=<password> -p 3306:3306 -d mysql:5.6`
+`docker run --name ib-mysql -e MYSQL_RANDOM_ROOT_PASSWORD=yes -e MYSQL_DATABASE=ibdb -e MYSQL_USER=ibuser -e MYSQL_PASSWORD=<password> -p 3306:3306 -d mysql:5.6`
 
 
 ## phpmyadmin
-`docker run --name myadmin -d --link ibmysql:db -p 8080:80 phpmyadmin/phpmyadmin`
+`docker run --name myadmin -d --link ib-mysql:db -p 8080:80 phpmyadmin/phpmyadmin`
+
+
+## container backend
+`docker run --name myib -p 5000:5000 -e "MYSQL_PASSWORD=<mysqlPassord>" -e "BASIC_AUTH_USERNAME=<user>" -e "BASIC_AUTH_PASSWORD=<password>" --link ib-mysql:ib-mysql gchevalley/com-stouffcapital-ib`
 
 
 ## Creating The Migration Repository

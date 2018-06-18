@@ -8,5 +8,6 @@ while true; do
     echo Deploy command failed, retrying in 5 secs...
     sleep 5
 done
+
 #exec python com-stouffcapital-ib.py
 exec gunicorn -b :5000 --access-logfile - --error-logfile - com-stouffcapital-ib:app

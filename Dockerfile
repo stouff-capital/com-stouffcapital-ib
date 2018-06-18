@@ -1,13 +1,16 @@
 
 FROM python:3
 MAINTAINER Greg Chevalley "gregory.chevalley+docker@gmail.com"
-COPY . /app
-WORKDIR /app
+
+COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
-RUN chmod +x ./boot.sh
+COPY app app
+COPY migrations migrations
+COPY com-stouffcapital-ib.py config.py boot.sh ./
+RUN chmod a+x boot.sh
 
-EXPOSE 5000
+ENV FLASK_APP com-stouffcapital-ib.py
 
 #ENTRYPOINT ["python"]
 #CMD ["com-stouffcapital-ib.py"]

@@ -1,0 +1,24 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-ib-backend
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  tls:
+  - hosts:
+    - ib.stouffcapital.com
+    secretName: ib-stouffcapital-service-tls
+  backend:
+    serviceName: default-http-backend
+    servicePort: 80
+  rules:
+  - host: ib.stouffcapital.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: ib-backend
+          servicePort: 5000
+
