@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 import os
 import csv
 import pandas as pd
+import numpy as np
 from app import db
 from app.models import Contract, Execution, Bbg
 from app.reports import bp
@@ -22,6 +23,9 @@ def reports_list():
 
 @bp.route('/reports/ib/eod', methods=['POST'])
 def ib_eod():
+
+    #return jsonify( {'data': len(request.data() ) } )
+
     if 'file' not in request.files:
         current_app.logger.warning('missing file')
         return jsonify( {'error': 'missing file'} )
@@ -283,9 +287,30 @@ def ib_eod():
         headers_intraday = ["intraday_positionChg", "intraday_ntcf"]
 
 
-        df_openPositions[ list(set(headers_pnl + headers_refData + headers_open + headers_intraday)) ].to_csv(os.path.join(SCRIPT_ROOT + '/data/', 'out.csv'), index=False, encoding='utf-8-sig')
-        
+        #df_openPositions[ list(set(headers_pnl + headers_refData + headers_open + headers_intraday)) ].to_csv(os.path.join(SCRIPT_ROOT + '/data/', 'out.csv'), index=False, encoding='utf-8-sig')
+
+        # export datamodel fa
+        df_openPositions['Identifier'] = np.nan
+        df_openPositions['bbg_underyling_id'] = np.nan
+        df_openPositions['Underlying'] = np.nan
+        df_openPositions['bbg_ticker'] = df_openPositions['Symbole']
+        df_openPositions['provider'] = "IB"
+        df_openPositions['strategy'] = filename.split('_')[0]
+        df_openPositions['CUSTOM_accpbpid'] = df_openPositions[['strategy', 'provider', 'Symbole']].apply(lambda x: '_'.join(x), axis=1)
+        df_openPositions['position_current'] = df_openPositions['Quantité'] + df_openPositions['intraday_positionChg']
+        df_openPositions['pnl_d_local'] = 0
+        df_openPositions['pnl_y_local'] = 0
+        df_openPositions['pnl_y_eod_local'] = df_openPositions['Évalué-au-Marché YTD']
+        df_openPositions['position_eod'] = df_openPositions['Quantité']
+        df_openPositions['price_eod'] = df_openPositions['Prix de Fermeture']
+        df_openPositions['ntcf_d_local'] = df_openPositions['intraday_ntcf']
 
 
 
+
+        df = df_openPositions.where((pd.notnull(df_openPositions)), None)
+
+        col_to_export = ['Identifier', 'bbg_underyling_id', 'Underlying', 'bbg_ticker', 'provider', 'strategy', 'CUSTOM_accpbpid', 'position_current', 'pnl_d_local', 'pnl_y_local', 'pnl_y_eod_local', 'position_eod', 'price_eod', 'ntcf_d_local', 'Symbole', 'Description']
+
+        return jsonify( df[0:5][col_to_export].to_dict(orient='records') )
         return jsonify( {'status': 'ok', 'file': filename, 'path': os.path.join(SCRIPT_ROOT + '/data/', filename), 'nbrehHaders': len(data), 'headers': list_headers   } )
