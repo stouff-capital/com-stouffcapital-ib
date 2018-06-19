@@ -1,8 +1,8 @@
-"""init tables
+"""init table
 
-Revision ID: 34018f0826f8
+Revision ID: 57dbc829856f
 Revises: 
-Create Date: 2018-06-06 23:12:28.312624
+Create Date: 2018-06-19 08:16:36.549556
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '34018f0826f8'
+revision = '57dbc829856f'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -33,6 +33,9 @@ def upgrade():
     )
     op.create_table('bbg',
     sa.Column('ticker', sa.String(length=75), nullable=True),
+    sa.Column('bbgIdentifier', sa.String(length=50), nullable=True),
+    sa.Column('bbgUnderylingId', sa.String(length=50), nullable=True),
+    sa.Column('internalUnderlying', sa.String(length=50), nullable=True),
     sa.Column('contract_localSymbol', sa.String(length=75), nullable=False),
     sa.ForeignKeyConstraint(['contract_localSymbol'], ['contract.localSymbol'], ),
     sa.PrimaryKeyConstraint('contract_localSymbol')

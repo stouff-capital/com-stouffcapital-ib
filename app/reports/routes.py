@@ -21,11 +21,36 @@ def allowed_file(filename):
 def reports_list():
     return jsonify( {'status': 'ok'} )
 
+
+@bp.route('/reports/ib/eod/upload', methods=['GET'])
+def ib_upload_eod_report_template():
+    return render_template('upload.html', page_title="Upload IB eod report", upload_url="/reports/ib/eod")
+
+
 @bp.route('/reports/ib/eod', methods=['POST'])
-def ib_eod():
+def ib_upload_eod_report():
 
-    #return jsonify( {'data': len(request.data() ) } )
+    if 'file' not in request.files:
+        current_app.logger.warning('missing file')
+        return jsonify( {'error': 'missing file'} )
 
+    file = request.files['file']
+    if file.filename == '':
+        current_app.logger.warning('file is empty')
+        return jsonify( {'error': 'file is empty'} )
+
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filename = filename.split("_")[0] + "_last.csv"
+        file.save(os.path.join(SCRIPT_ROOT + '/data/', filename))
+
+        return jsonify( {'status': 'ok', 'message': 'successfully uploaded'} )
+
+
+@bp.route('/reports/ib/eod', methods=['GET'])
+def ib_eod_positions():
+
+    '''
     if 'file' not in request.files:
         current_app.logger.warning('missing file')
         return jsonify( {'error': 'missing file'} )
@@ -40,26 +65,30 @@ def ib_eod():
 
 
         file.save(os.path.join(SCRIPT_ROOT + '/data/', filename))
+    '''
 
-        data = {}
-        with open(os.path.join(SCRIPT_ROOT + '/data/', filename), 'r', encoding='utf-8-sig') as f:
-            k = 0
-            for row in f:
-                for one_row in csv.reader([row]):
-                    break
+    data = {}
+    filename = 'U1160693_last.csv'
 
-                if one_row[0] != '':
-                    if one_row[0] in data:
-                        pass
-                    else:
-                        data[ one_row[0] ] = []
+    if os.path.isfile(os.path.join(SCRIPT_ROOT + '/data/', filename)):
+        pass
+    else:
+        current_app.logger.warning('missing file')
+        return jsonify( {'error': 'missing file'} )
 
-                    data[ one_row[0] ].append(one_row)
-                    k += 1
 
-        list_headers = []
-        for header in data:
-            list_headers.append(header)
+    with open(os.path.join(SCRIPT_ROOT + '/data/', filename), 'r', encoding='utf-8-sig') as f:
+        for row in f:
+            for one_row in csv.reader([row]):
+                break
+
+            if one_row[0] != '':
+                if one_row[0] in data:
+                    pass
+                else:
+                    data[ one_row[0] ] = []
+
+                data[ one_row[0] ].append(one_row)
 
 
         headers_intraday = ["intraday_positionChg", "intraday_ntcf"]
@@ -312,5 +341,5 @@ def ib_eod():
 
         col_to_export = ['Identifier', 'bbg_underyling_id', 'Underlying', 'bbg_ticker', 'provider', 'strategy', 'CUSTOM_accpbpid', 'position_current', 'pnl_d_local', 'pnl_y_local', 'pnl_y_eod_local', 'position_eod', 'price_eod', 'ntcf_d_local', 'Symbole', 'Description']
 
-        return jsonify( df[0:5][col_to_export].to_dict(orient='records') )
+        return jsonify( df[:][col_to_export].to_dict(orient='records') )
         return jsonify( {'status': 'ok', 'file': filename, 'path': os.path.join(SCRIPT_ROOT + '/data/', filename), 'nbrehHaders': len(data), 'headers': list_headers   } )

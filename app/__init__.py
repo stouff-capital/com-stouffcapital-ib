@@ -20,6 +20,10 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
 
+
+    from app.contracts import bp as contracts_bp
+    app.register_blueprint(contracts_bp)
+
     from app.executions import bp as executions_bp
     app.register_blueprint(executions_bp)
 
