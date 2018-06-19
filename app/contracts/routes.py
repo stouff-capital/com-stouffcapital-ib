@@ -7,7 +7,17 @@ from app.contracts import bp
 
 @bp.route('/contracts', methods=['GET'])
 def contract_index():
-    return jsonify( {'status': 'ok'} )
+    return jsonify( {'status': 'ok', 'controller': 'contracts'} )
+
+
+@bp.route('/contracts/<localSymbol>/exists', methods=['GET'])
+def contract_exists(localSymbol):
+
+    contract = Contract.query.get(localSymbol)
+    if contract != None:
+        return jsonify( {'status': 'ok', 'input': localSymbol, 'exists': True} )
+    else:
+        return jsonify( {'status': 'ok', 'input': localSymbol, 'exists': False} )
 
 
 @bp.route('/contracts', methods=['POST'])
@@ -29,10 +39,10 @@ def contract_create():
     else:
         if 'localSymbol' in data:
             if data['localSymbol'] == '':
-                localSymbol = data['symbol']
+                return jsonify( {'status': 'error', 'error': 'empty localSymbol'} )
             else:
                 contract = Contract(
-                    localSymbol=localSymbol
+                    localSymbol=data['localSymbol']
                 )
         else:
             return jsonify( {'status': 'error', 'error': 'missing localSymbol'} )

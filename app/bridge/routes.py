@@ -16,7 +16,7 @@ def missing():
     contracts = Contract.query.filter(Contract.localSymbol.notin_(existing_ids))
 
     contracts_ib = [contract.localSymbol for contract in contracts ]
-    return jsonify( {'status': 'ok', 'ib': contracts_ib} )
+    return jsonify( {'status': 'ok', 'ib': contracts_ib, 'missing': contracts_ib} )
 
 
 @bp.route('/bridge', methods=['POST'])
@@ -43,6 +43,14 @@ def create():
                 ticker=data['ticker'],
                 contract=contract #object
             )
+
+            bbg_fields = ['bbgIdentifier', 'bbgUnderylingId', 'internalUnderlying']
+            for bbg_field in bbg_fields:
+                if bbg_field in data:
+                    setattr(bbg, bbg_field, data[bbg_field])
+
+
+
             db.session.add(bbg)
             db.session.commit()
             current_app.logger.info('new bridge')

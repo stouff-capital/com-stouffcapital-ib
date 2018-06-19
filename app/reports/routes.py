@@ -1,13 +1,15 @@
 from datetime import datetime
-from flask import render_template, flash, redirect, url_for, request, g, jsonify, current_app
+from flask import render_template, flash, json, redirect, url_for, request, g, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
 import csv
 import pandas as pd
 import numpy as np
+import requests
 from app import db
-from app.models import Contract, Execution, Bbg
+from app.models import Contract, Bbg
 from app.reports import bp
+from app.contracts import routes as routes_contract
 
 
 SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -16,6 +18,7 @@ ALLOWED_EXTENSIONS = set(['csv'])
 # utilities
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @bp.route('/reports', methods=['GET'])
 def reports_list():
@@ -108,6 +111,7 @@ def ib_eod_positions():
         df_lastDayPerf = df_lastDayPerf[ df_lastDayPerf['Header'] == 'Data' ]
 
         for field in numeric_fields:
+            df_lastDayPerf[field] = df_lastDayPerf[field].replace(to_replace='--', value=np.nan)
             df_lastDayPerf[field] = pd.to_numeric( df_lastDayPerf[field].str.replace(',', '') )
 
         headers_toShow = ['Catégorie d\'actifs', 'Symbole', 'Avant Quantité', 'Courant Quantité', 'Courant Prix', 'Pertes et profits au prix du marché Total']
@@ -126,6 +130,7 @@ def ib_eod_positions():
         df_pnl = df_pnl[ df_pnl['Header'] == 'Data' ]
 
         for field in numeric_fields:
+            df_pnl[field] = df_pnl[field].replace(to_replace='--', value=np.nan)
             df_pnl[field] = pd.to_numeric( df_pnl[field].str.replace(',', '') )
 
         headers_toShow = ['Catégorie d\'actifs', 'Symbole', 'Realisé Total', 'Non-Réalisé Total', 'Total']
@@ -146,6 +151,7 @@ def ib_eod_positions():
         df_mthYtd_Pnl = df_mthYtd_Pnl[ df_mthYtd_Pnl['Catégorie d\'actifs'] != 'Total (Tous les actifs)' ]
 
         for field in numeric_fields:
+            df_mthYtd_Pnl[field] = df_mthYtd_Pnl[field].replace(to_replace='--', value=np.nan)
             df_mthYtd_Pnl[field] = pd.to_numeric( df_mthYtd_Pnl[field].str.replace(',', '') )
 
         # inject intraday
@@ -170,6 +176,7 @@ def ib_eod_positions():
         df_openPositions = df_openPositions[ df_openPositions['Header'] == 'Data' ]
 
         for field in numeric_fields:
+            df_openPositions[field] = df_openPositions[field].replace(to_replace='--', value=np.nan)
             df_openPositions[field] = pd.to_numeric( df_openPositions[field].str.replace(',', '') )
 
         # inject intraday
@@ -193,6 +200,7 @@ def ib_eod_positions():
         df_transactions = df_transactions[ df_transactions['Header'] == 'Data' ]
 
         for field in numeric_fields:
+            df_transactions[field] = df_transactions[field].replace(to_replace='--', value=np.nan)
             df_transactions[field] = pd.to_numeric( df_transactions[field].str.replace(',', '') )
 
         headers_toShow = ['Catégorie d\'actifs', 'Devise', 'Symbole', 'Date/Heure', 'Quantité', 'Prix Trans.', 'Prix Ferm.', 'Produits', 'Comm/Tarif', 'Base', 'P/L Réalisé', 'P/L MTM', 'Code']
@@ -246,6 +254,7 @@ def ib_eod_positions():
         df_refData = pd.concat(list_refData, axis=0, ignore_index=True)
 
         for field in numeric_fields:
+            df_refData[field] = df_refData[field].replace(to_replace='--', value=np.nan)
             df_refData[field] = pd.to_numeric( df_refData[field].str.replace(',', '') )
 
 
@@ -313,16 +322,95 @@ def ib_eod_positions():
         df_openPositions = pd.DataFrame(list_openPositions + list_closePosToAdd)
 
 
+
+        # merge with input list with transactions
+        list_openPositions = df_openPositions.to_dict(orient='record')
+
+        new_openPos = []
+        input_data = request.get_json()
+        if input_data != None and 'execDetails' in input_data:
+            for exec in input_data['execDetails']:
+                already_in_dataset = False
+
+                side = 1
+                if exec['execution']['m_side'][:1].upper() == "B":
+                    side = 1
+                elif exec['execution']['m_side'][:1].upper() == "S":
+                    side = -1
+
+                if exec['contract']['m_multiplier']!= None and exec['contract']['m_multiplier'].lstrip('-').replace('.','',1).isdigit():
+                    contractSize = float(exec['contract']['m_multiplier'])
+                else:
+                    contractSize = 1
+
+                for pos in list_openPositions:
+                    if pos['Symbole'] == exec['contract']['m_localSymbol'] or pos['Description'] == exec['contract']['m_localSymbol']: #options #
+                        already_in_dataset = True
+
+                        pos['intraday_positionChg'] += side * exec['execution']['m_shares']
+                        pos['intraday_ntcf'] += -side * exec['execution']['m_shares'] * exec['execution']['m_price'] * contractSize
+
+
+                        #print(exec['contract']['m_localSymbol'], 'already in db')
+                        break
+
+                if already_in_dataset == False:
+                    print(exec['contract']['m_localSymbol'], 'not found')
+
+                    # browse new pos
+                    already_in_new_pos = False
+                    for new_pos in new_openPos:
+                        if new_pos['Symbole'] == exec['contract']['m_localSymbol'] or new_pos['Description'] == exec['contract']['m_localSymbol']:
+
+                            already_in_new_pos = True
+
+                            new_pos['intraday_positionChg'] += side * exec['execution']['m_shares']
+                            new_pos['intraday_ntcf'] += -side * exec['execution']['m_shares'] * exec['execution']['m_price'] * contractSize
+
+                    if already_in_new_pos == False:
+
+                        if exec['contract']['m_expiry'] != None and exec['contract']['m_expiry'] != '' and exec['contract']['m_expiry'].lstrip('-').replace('.','',1).isdigit():
+                            expiryDate = pd.to_datetime(exec['contract']['m_expiry'], format="%Y%m%d")
+                        else:
+                            expiryDate = pd.NaT
+
+
+                        new_pos = {
+                            'intraday_positionChg': side * exec['execution']['m_shares'],
+                            'intraday_ntcf':  -side * exec['execution']['m_shares'] * exec['execution']['m_price'] * contractSize,
+                            'Catégorie d\'actifs': exec['contract']['m_secType'],
+                            'Conid': exec['contract']['m_conId'],
+                            'Devise': exec['contract']['m_currency'],
+                            'Expiration': exec['contract']['m_expiry'],
+                            'Mult': contractSize,
+                            'Multiplicateur': contractSize,
+                            'P&L non réalisé %': 0,
+                            'P/L Non-Réalisé': 0,
+                            'Positions ouvertes': 0,
+                            'Prix d\'origine': 0,
+                            'Prix de Fermeture': 0,
+                            'Type': exec['contract']['m_right'],
+                            'Prix de Levée': exec['contract']['m_strike'],
+                            'Quantité': 0,
+                            'Symbole': exec['contract']['m_localSymbol'],
+                            'Description': exec['contract']['m_localSymbol'], # ?
+                            'Valeur': 0,
+                            'Valeur d\'Origine': 0,
+                            'Évalué-au-Marché YTD': 0
+
+                        }
+                        new_openPos.append(new_pos)
+
+
+
+            df_openPositions = pd.DataFrame(list_openPositions + new_openPos)
+
+
+
+        # final report
         headers_intraday = ["intraday_positionChg", "intraday_ntcf"]
 
 
-        #df_openPositions[ list(set(headers_pnl + headers_refData + headers_open + headers_intraday)) ].to_csv(os.path.join(SCRIPT_ROOT + '/data/', 'out.csv'), index=False, encoding='utf-8-sig')
-
-        # export datamodel fa
-        df_openPositions['Identifier'] = np.nan
-        df_openPositions['bbg_underyling_id'] = np.nan
-        df_openPositions['Underlying'] = np.nan
-        df_openPositions['bbg_ticker'] = df_openPositions['Symbole']
         df_openPositions['provider'] = "IB"
         df_openPositions['strategy'] = filename.split('_')[0]
         df_openPositions['CUSTOM_accpbpid'] = df_openPositions[['strategy', 'provider', 'Symbole']].apply(lambda x: '_'.join(x), axis=1)
@@ -335,11 +423,52 @@ def ib_eod_positions():
         df_openPositions['ntcf_d_local'] = df_openPositions['intraday_ntcf']
 
 
+        # merge avec CV bbg
+        df_bridge = pd.read_sql(sql="SELECT * FROM bbg", con=db.engine)
 
+        df_bridge.rename(columns={'ticker': 'bbg_ticker',
+                          'bbgIdentifier': 'Identifier',
+                          'bbgUnderylingId': 'bbg_underyling_id',
+                          'internalUnderlying': 'Underlying',
+                          'contract_localSymbol': 'Symbole', }
+                 , inplace=True)
 
+        df_openPositions = pd.merge(df_openPositions, df_bridge, on=['Symbole'], how='left')
+
+        # patch np.nan to json null
         df = df_openPositions.where((pd.notnull(df_openPositions)), None)
 
-        col_to_export = ['Identifier', 'bbg_underyling_id', 'Underlying', 'bbg_ticker', 'provider', 'strategy', 'CUSTOM_accpbpid', 'position_current', 'pnl_d_local', 'pnl_y_local', 'pnl_y_eod_local', 'position_eod', 'price_eod', 'ntcf_d_local', 'Symbole', 'Description']
+        if len(df_bridge) == 0:
+            col_to_export = ['provider', 'strategy', 'CUSTOM_accpbpid', 'position_current', 'pnl_d_local', 'pnl_y_local', 'pnl_y_eod_local', 'position_eod', 'price_eod', 'ntcf_d_local', 'Symbole', 'Description']
+
+            list_openPositions = df_openPositions.to_dict(orient='record')
+
+            for pos in list_openPositions:
+                check_existing_contrat = json.loads( routes_contract.contract_exists(pos['Symbole']).get_data() )
+                if check_existing_contrat['exists'] == False:
+                    contract = Contract(
+                        localSymbol=pos['Symbole']
+                    )
+                    db.session.add(contract)
+                    db.session.commit()
+                    current_app.logger.info('new contract: ' + pos['Symbole'])
+
+        else:
+            col_to_export = ['Identifier', 'bbg_underyling_id', 'Underlying', 'bbg_ticker', 'provider', 'strategy', 'CUSTOM_accpbpid', 'position_current', 'pnl_d_local', 'pnl_y_local', 'pnl_y_eod_local', 'position_eod', 'price_eod', 'ntcf_d_local', 'Symbole', 'Description']
+
+            # creation des contracts si necessaire
+            list_openPositions = df_openPositions.to_dict(orient='record')
+            for pos in list_openPositions:
+                print(pos['Identifier'])
+                if pd.isnull(pos['Identifier']):
+                    check_existing_contrat = json.loads( routes_contract.contract_exists(pos['Symbole']).get_data() )
+                    if check_existing_contrat['exists'] == False:
+                        contract = Contract(
+                            localSymbol=pos['Symbole']
+                        )
+                        db.session.add(contract)
+                        db.session.commit()
+                        current_app.logger.info('new contract: ' + pos['Symbole'])
+
 
         return jsonify( df[:][col_to_export].to_dict(orient='records') )
-        return jsonify( {'status': 'ok', 'file': filename, 'path': os.path.join(SCRIPT_ROOT + '/data/', filename), 'nbrehHaders': len(data), 'headers': list_headers   } )
