@@ -60,3 +60,7 @@ Set esResponse = esClient.Execute(esRequest)
 
 End Function
 ```
+
+## kubernetes deployment
+`kubectl create secret generic ib --from-literal=mysql-password=<pass> --from-literal=backend-user=<user> --from-literal=backend-password=<pass>`
+

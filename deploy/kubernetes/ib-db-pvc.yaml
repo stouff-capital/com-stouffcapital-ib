@@ -5,7 +5,7 @@ metadata:
   labels:
     app: ib
 spec:
-  storageClassName: rook-ceph-block
+  storageClassName: rook-block
   accessModes:
   - ReadWriteOnce
   resources:
