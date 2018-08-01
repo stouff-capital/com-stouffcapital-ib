@@ -175,95 +175,39 @@ def ib_eod_positions():
         df_refData = pd.DataFrame( list_refData )
 
 
-
-
-
-        '''
-        # Synthèse de la performance évaluée au prix du marché (open pos only) intraday ?
-        header = 'Synthèse de la performance évaluée au prix du marché'
-
-        # issue with 'Avant Prix'
-        numeric_fields = ['Avant Quantité', 'Courant Quantité', 'Courant Prix', 'Pertes et profits au prix du marché Position', 'Pertes et profits au prix du marché Commissions', 'Pertes et profits au prix du marché Autre', 'Pertes et profits au prix du marché Total']
-
-        df_lastDayPerf = pd.DataFrame(
-            data=data[header][1:],
-            columns=data[header][0])
-
-
-        df_lastDayPerf = df_lastDayPerf[ df_lastDayPerf['Header'] == 'Data' ]
-
-        for field in numeric_fields:
-            df_lastDayPerf[field] = df_lastDayPerf[field].replace(to_replace='--', value=np.nan)
-            df_lastDayPerf[field] = pd.to_numeric( df_lastDayPerf[field].str.replace(',', '') )
-
-        headers_toShow = ['Catégorie d\'actifs', 'Symbole', 'Avant Quantité', 'Courant Quantité', 'Courant Prix', 'Pertes et profits au prix du marché Total']
-
-
-        # Synthèse de la performance réalisée et non-réalisée (open pos only) intraday?
-        header = 'Synthèse de la performance réalisée et non-réalisée'
-
-        numeric_fields = ['Aj. coût', 'Realisé Profit C/T', 'Realisé Perte C/T', 'Realisé Profit L/T', 'Realisé Perte L/T', 'Realisé Total', 'Non-Réalisé Profit C/T', 'Non-Réalisé Perte C/T', 'Non-Réalisé Profit L/T', 'Non-Réalisé Perte L/T', 'Non-Réalisé Total', 'Total']
-
-        df_pnl = pd.DataFrame(
-            data=data[header][1:],
-            columns=data[header][0])
-
-
-        df_pnl = df_pnl[ df_pnl['Header'] == 'Data' ]
-
-        for field in numeric_fields:
-            df_pnl[field] = df_pnl[field].replace(to_replace='--', value=np.nan)
-            df_pnl[field] = pd.to_numeric( df_pnl[field].str.replace(',', '') )
-
-        headers_toShow = ['Catégorie d\'actifs', 'Symbole', 'Realisé Total', 'Non-Réalisé Total', 'Total']
-        '''
-
         # Synthèse de la performance pour le mois et l'année en cours (everything)
         header = 'Synthèse de la performance pour le mois et l\'année en cours'
 
         numeric_fields = ['Évalué-au-Marché MJM', 'Évalué-au-Marché YTD', 'Réalisé C/T MJM', 'Réalisé C/T YTD', 'Realisé L/T MJM', 'Realisé L/T YTD']
 
-        df_mthYtd_Pnl = pd.DataFrame(
-            data=data[header][1:],
-            columns=data[header][0])
+        try:
+            df_mthYtd_Pnl = pd.DataFrame(
+                data=data[header][1:],
+                columns=data[header][0])
 
+            df_mthYtd_Pnl = df_mthYtd_Pnl[ df_mthYtd_Pnl['Header'] == 'Data' ]
+            df_mthYtd_Pnl = df_mthYtd_Pnl[ df_mthYtd_Pnl['Catégorie d\'actifs'] != 'Total' ]
+            df_mthYtd_Pnl = df_mthYtd_Pnl[ df_mthYtd_Pnl['Catégorie d\'actifs'] != 'Total (Tous les actifs)' ]
 
-        df_mthYtd_Pnl = df_mthYtd_Pnl[ df_mthYtd_Pnl['Header'] == 'Data' ]
-        df_mthYtd_Pnl = df_mthYtd_Pnl[ df_mthYtd_Pnl['Catégorie d\'actifs'] != 'Total' ]
-        df_mthYtd_Pnl = df_mthYtd_Pnl[ df_mthYtd_Pnl['Catégorie d\'actifs'] != 'Total (Tous les actifs)' ]
+            for field in numeric_fields:
+                df_mthYtd_Pnl[field] = df_mthYtd_Pnl[field].replace(to_replace='--', value=np.nan)
+                df_mthYtd_Pnl[field] = pd.to_numeric( df_mthYtd_Pnl[field].str.replace(',', '') )
 
-        for field in numeric_fields:
-            df_mthYtd_Pnl[field] = df_mthYtd_Pnl[field].replace(to_replace='--', value=np.nan)
-            df_mthYtd_Pnl[field] = pd.to_numeric( df_mthYtd_Pnl[field].str.replace(',', '') )
+            # inject intraday
+            for intraday_field in headers_intraday:
+                df_mthYtd_Pnl[intraday_field] = 0.0
 
-        # inject intraday
-        for intraday_field in headers_intraday:
-            df_mthYtd_Pnl[intraday_field] = 0.0
-
-
-        # patch symbol option (stored in descritpion) !non car les symboles peu visibles sont ceux qui descendent avec les intraday exec
-        '''
-        list_mthYtd_Pnl =  df_mthYtd_Pnl.to_dict(orient='record')
-        for pnl in list_mthYtd_Pnl:
-            if pnl['Catégorie d\'actifs'][0:6].upper() == 'Option'.upper():
-                tmp_description = pnl['Symbole']
-                tmp_symbole = pnl['Description']
-
-                pnl['Symbole'] = tmp_symbole
-                pnl['Description'] = tmp_description
-
-        df_mthYtd_Pnl = pd.DataFrame( list_mthYtd_Pnl )
-        '''
-
-        #headers_pnl = ['Catégorie d\'actifs', 'Symbole', 'Évalué-au-Marché YTD', 'Réalisé C/T YTD', 'Realisé L/T YTD' ] + headers_intraday
-        headers_pnl = ['Catégorie d\'actifs', 'Symbole', 'Évalué-au-Marché YTD' ] + headers_intraday
-        headers_toShow = headers_pnl
+            headers_pnl = ['Catégorie d\'actifs', 'Symbole', 'Évalué-au-Marché YTD' ] + headers_intraday
+            headers_toShow = headers_pnl
+        except:
+            df_mthYtd_Pnl = pd.DataFrame([])
 
 
         # positions ouvertes
         header = 'Positions ouvertes'
 
-        numeric_fields = ['Quantité', 'Mult', 'Prix d\'origine', 'Valeur d\'Origine', 'Prix de Fermeture', 'Valeur', 'P/L Non-Réalisé', 'P&L non réalisé %']
+        #numeric_fields = ['Quantité', 'Mult', 'Prix d\'origine', 'Valeur d\'Origine', 'Prix de Fermeture', 'Valeur', 'P/L Non-Réalisé', 'P&L non réalisé %']
+        numeric_fields = ['Quantité', 'Mult', 'Prix de Fermeture', 'Valeur']
 
         df_openPositions = pd.DataFrame(
             data=data[header][1:],
@@ -280,7 +224,8 @@ def ib_eod_positions():
         for intraday_field in headers_intraday:
             df_openPositions[intraday_field] = 0.0
 
-        headers_open = ['Catégorie d\'actifs', 'Devise', 'Symbole', 'Quantité', 'Mult', 'Prix de Fermeture', 'Valeur', 'P/L Non-Réalisé'] + headers_intraday
+        #headers_open = ['Catégorie d\'actifs', 'Devise', 'Symbole', 'Quantité', 'Mult', 'Prix de Fermeture', 'Valeur', 'P/L Non-Réalisé'] + headers_intraday
+        headers_open = ['Catégorie d\'actifs', 'Devise', 'Symbole', 'Quantité', 'Mult', 'Prix de Fermeture', 'Valeur'] + headers_intraday
         headers_toShow = headers_open
 
 
@@ -292,35 +237,6 @@ def ib_eod_positions():
                  if len(mask) > 0:
                      openPos['Symbole'] = mask['Symbole'].values[0]
         df_openPositions = pd.DataFrame(list_openPositions)
-
-
-        '''
-        # Transcations
-        header = 'Transactions'
-
-        numeric_fields = ['Quantité', 'Prix Trans.', 'Prix Ferm.', 'Produits', 'Comm/Tarif', 'Base', 'P/L Réalisé', '% P&L réalisé', 'P/L MTM']
-
-        df_transactions = pd.DataFrame(
-            data=data[header][1:],
-            columns=data[header][0])
-
-
-        df_transactions = df_transactions[ df_transactions['Header'] == 'Data' ]
-
-        for field in numeric_fields:
-            df_transactions[field] = df_transactions[field].replace(to_replace='--', value=np.nan)
-            df_transactions[field] = pd.to_numeric( df_transactions[field].str.replace(',', '') )
-
-        headers_toShow = ['Catégorie d\'actifs', 'Devise', 'Symbole', 'Date/Heure', 'Quantité', 'Prix Trans.', 'Prix Ferm.', 'Produits', 'Comm/Tarif', 'Base', 'P/L Réalisé', 'P/L MTM', 'Code']
-
-
-        datetime_fields = ['Date/Heure']
-        for field in datetime_fields:
-            df_transactions[field] = pd.to_datetime( df_transactions[field], format="%Y-%m-%d, %H:%M:%S" )
-        '''
-
-
-
 
         list_openPositions = df_openPositions.to_dict(orient='record')
 
@@ -464,7 +380,10 @@ def ib_eod_positions():
         df_openPositions['position_current'] = df_openPositions['Quantité'] + df_openPositions['intraday_positionChg']
         df_openPositions['pnl_d_local'] = 0
         df_openPositions['pnl_y_local'] = 0
-        df_openPositions['pnl_y_eod_local'] = df_openPositions['Évalué-au-Marché YTD']
+        try:
+            df_openPositions['pnl_y_eod_local'] = df_openPositions['Évalué-au-Marché YTD']
+        except:
+            df_openPositions['pnl_y_eod_local'] = 0
         df_openPositions['position_eod'] = df_openPositions['Quantité']
         df_openPositions['price_eod'] = df_openPositions['Prix de Fermeture']
         df_openPositions['ntcf_d_local'] = df_openPositions['intraday_ntcf']
