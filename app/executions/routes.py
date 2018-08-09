@@ -21,6 +21,50 @@ def list():
     return jsonify( {'status': 'ok'} )
 
 
+
+@bp.route('/executions/time/<date_str>', methods=['GET'])
+def list_limit_date(date_str):
+    executions = Execution.query.filter(Execution.time >= date_str).all()
+
+    execs = {} # dict with execId as key
+    for exec in executions:
+        one_exec = {}
+
+        one_exec['execId'] = exec.execId
+        one_exec['orderId'] = exec.orderId
+        one_exec['time'] = exec.time
+        one_exec['acctNumber'] = exec.acctNumber
+        one_exec['exchange'] = exec.exchange
+        one_exec['side'] = exec.side
+        one_exec['shares'] = exec.shares  # execQty
+        one_exec['cumQty'] = exec.cumQty
+        one_exec['price'] = exec.price
+        one_exec['avgPrice'] = exec.avgPrice
+        one_exec['permId'] = exec.permId
+
+
+        one_exec['contract'] = {
+            'localSymbol': exec.contract.localSymbol
+        }
+        bbg = exec.contract.bbg
+        if bbg != None:
+            one_exec['bbg'] = {
+                'ticker': exec.contract.bbg.ticker,
+                'bbgIdentifier': exec.contract.bbg.bbgIdentifier,
+                'bbgUnderylingId': exec.contract.bbg.bbgUnderylingId,
+                'internalUnderlying': exec.contract.bbg.internalUnderlying
+            }
+        execs[exec.execId] = one_exec
+
+    return jsonify( {
+        'status': 'ok',
+        'time': date_str,
+        'count': len(executions),
+        'executions': execs
+    } )
+
+
+
 @bp.route('/executions', methods=['GET'])
 def read():
     return jsonify( {'status': 'ok'} )
