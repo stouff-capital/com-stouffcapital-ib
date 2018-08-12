@@ -359,7 +359,10 @@ def ib_eod_data_transactions():
             transaction['valeurBase'] = transaction['Produits'] * transaction['fxRate']
             transaction['valeurGrossBase'] = abs(transaction['valeurBase'])
             transaction['Comm/TarifBase'] = -abs(transaction['Comm/Tarif']) * transaction['fxRate']
-            transaction['TarifBps'] = 10000 * ( -abs(transaction['Comm/Tarif']) / abs(transaction['Produits']) )
+            try:
+                transaction['TarifBps'] = 10000 * ( -abs(transaction['Comm/Tarif']) / abs(transaction['Produits']) )
+            except:
+                transaction['TarifBps'] = 0
 
         df_transactions = pd.DataFrame(list_transactions)
 
@@ -560,7 +563,7 @@ def ib_eod():
             list_refData.append(df_refData)
 
         #cols
-        df_refData = pd.concat(list_refData, axis=0, ignore_index=True, sort=False)
+        df_refData = pd.concat(list_refData, axis=0, ignore_index=True, sort=False) # pandas-0.23
         #df_refData = pd.concat(list_refData, axis=0, ignore_index=True)
 
         for field in numeric_fields:

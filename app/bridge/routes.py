@@ -155,7 +155,7 @@ def conv_bbgtickers_into_ibsymbols():
         bridge = bbgticker_to_ibsymbol(ticker, bridges)
 
         if bridge == None:
-            output['output'].append( {'status': 'error', 'error': 'not able to translate, ask user', 'ticker': ticker} )
+            output['output'].append( {'status': 'error', 'error': 'not able to translate, ask user', 'ticker': ticker, 'input': ticker} )
         else:
             contract = bridge.contract
             output['output'].append({'status': 'ok', 'input': ticker.upper(),
