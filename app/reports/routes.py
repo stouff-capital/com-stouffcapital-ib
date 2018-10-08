@@ -14,7 +14,7 @@ from app.executions import routes as routes_executions
 
 
 SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
-IB_FILE_LAST = 'U1160693_last.csv'
+IB_FILE_LAST = 'MULTI_last.csv'
 ALLOWED_EXTENSIONS = set(['csv'])
 
 # utilities
@@ -88,6 +88,83 @@ def ib_eod_data_statement():
         df_statement.drop(columns=['Header', 'Statement'], inplace=True)
 
         return df_statement
+
+
+def ib_eod_data_informationsDuCompte():
+    data = ib_eod_data_preparation()
+
+    if len(data) == 0:
+        return pd.DataFrame( [] )
+    else:
+        header = "Informations du compte"
+        df_informationsDuCompte = pd.DataFrame(
+                        data=data[header][1:],
+                        columns=data[header][0])
+
+        df_informationsDuCompte = df_informationsDuCompte[ df_informationsDuCompte['Header'] == 'Data' ]
+
+        df_informationsDuCompte.drop(columns=['Header', 'Informations du compte'], inplace=True)
+
+        list_informationsDuCompte = df_informationsDuCompte.to_dict(orient='record')
+
+        dict_informationsDuCompte = {}
+        for data in list_informationsDuCompte:
+            dict_informationsDuCompte[ data['Nom champ'] ] = data['Valeur champ']
+
+        #return df_informationsDuCompte
+        return dict_informationsDuCompte
+
+
+def ib_eod_data_actifNet():
+    data = ib_eod_data_preparation()
+
+    if len(data) == 0:
+        return pd.DataFrame( [] )
+    else:
+        header = "Actif net"
+        df_actifNet = pd.DataFrame(
+                        data=data[header][1:],
+                        columns=data[header][0])
+
+        df_actifNet = df_actifNet[ df_actifNet['Header'] == 'Data' ]
+
+        numeric_fields = ['Total précédent', 'Actuel long', 'Actuel short', 'Total actuel', 'Variation']
+        for field in numeric_fields:
+            df_actifNet[field] = df_actifNet[field].replace(to_replace='--', value=np.nan)
+            df_actifNet[field] = pd.to_numeric( df_actifNet[field].str.replace(',', '') )
+
+        df_actifNet.drop(columns=['Header', 'Actif net'], inplace=True)
+
+        return df_actifNet
+
+
+def ib_eod_data_changementsActifNet():
+    data = ib_eod_data_preparation()
+
+    if len(data) == 0:
+        return pd.DataFrame( [] )
+    else:
+        header = 'Changements de l\'actif net'
+
+        df_changementsActifNet = pd.DataFrame(
+            data=data[header][1:],
+            columns=data[header][0])
+
+        numeric_fields = ['Valeur champ']
+        for field in numeric_fields:
+            df_changementsActifNet[field] = df_changementsActifNet[field].replace(to_replace='--', value=np.nan)
+            df_changementsActifNet[field] = pd.to_numeric( df_changementsActifNet[field].str.replace(',', '') )
+
+        df_changementsActifNet.drop(columns=['Header', 'Changements de l\'actif net'], inplace=True)
+
+        list_changementsActifNet = df_changementsActifNet.to_dict(orient='record')
+
+        dict_changementsActifNet = {}
+        for data in list_changementsActifNet:
+            dict_changementsActifNet[ data['Nom champ'] ] = data['Valeur champ']
+
+        #return df_changementsActifNet
+        return dict_changementsActifNet
 
 
 def ib_eod_data_instruments():
@@ -387,8 +464,30 @@ def ib_expose_eod_file():
 @bp.route('/reports/ib/eod/statement', methods=['GET'])
 def ib_eod_statement():
     df = ib_eod_data_statement()
-
     return jsonify( df.to_dict(orient='records') )
+
+
+@bp.route('/reports/ib/eod/informationsducompte', methods=['GET'])
+def ib_eod_informationsDuCompte():
+    #df = ib_eod_data_informationsDuCompte()
+    #return jsonify( df.to_dict(orient='records') )
+
+    return jsonify( ib_eod_data_informationsDuCompte() )
+
+
+@bp.route('/reports/ib/eod/actifnet', methods=['GET'])
+def ib_eod_actifNet():
+    df = ib_eod_data_actifNet()
+    return jsonify( df.to_dict(orient='records') )
+
+
+@bp.route('/reports/ib/eod/changementsactifnet', methods=['GET'])
+def ib_eod_changementsActifNet():
+    #df = ib_eod_data_changementsActifNet()
+    #return jsonify( df.to_dict(orient='records') )
+
+    return jsonify( ib_eod_data_changementsActifNet() )
+
 
 @bp.route('/reports/ib/eod/instruments', methods=['GET'])
 def ib_eod_instruments():
@@ -487,16 +586,15 @@ def ib_eod():
     '''
 
     data = {}
-    filename = 'U1160693_last.csv'
 
-    if os.path.isfile(os.path.join(SCRIPT_ROOT + '/data/', filename)):
+    if os.path.isfile(os.path.join(SCRIPT_ROOT + '/data/', IB_FILE_LAST)):
         pass
     else:
         current_app.logger.warning('missing file')
         return jsonify( {'error': 'missing file'} )
 
 
-    with open(os.path.join(SCRIPT_ROOT + '/data/', filename), 'r', encoding='utf-8-sig') as f:
+    with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FILE_LAST), 'r', encoding='utf-8-sig') as f:
         for row in f:
             for one_row in csv.reader([row]):
                 break
@@ -720,7 +818,7 @@ def ib_eod():
                 elif exec['execution']['m_side'][:1].upper() == "S":
                     side = -1
 
-                if exec['contract']['m_multiplier']!= None and exec['contract']['m_multiplier'].lstrip('-').replace('.','',1).isdigit():
+                if exec['contract']['m_multiplier'] != None and exec['contract']['m_multiplier'].lstrip('-').replace('.', '', 1).isdigit():
                     contractSize = float(exec['contract']['m_multiplier'])
                 else:
                     contractSize = 1
@@ -792,7 +890,7 @@ def ib_eod():
 
 
         df_openPositions['provider'] = "IB"
-        df_openPositions['strategy'] = filename.split('_')[0]
+        df_openPositions['strategy'] = IB_FILE_LAST.split('_')[0]
         df_openPositions['CUSTOM_accpbpid'] = df_openPositions[['strategy', 'provider', 'Symbole']].apply(lambda x: '_'.join(x), axis=1)
         df_openPositions['position_current'] = df_openPositions['Quantité'] + df_openPositions['intraday_positionChg']
         df_openPositions['pnl_d_local'] = 0
