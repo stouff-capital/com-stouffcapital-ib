@@ -32,7 +32,16 @@ def create_app(config_class=Config):
 
     from app.reports import bp as reports_bp
     app.register_blueprint(reports_bp)
-    
+
+    from app.ibcontracts import bp as ibcontracts_bp
+    app.register_blueprint(ibcontracts_bp)
+
+    from app.ibexecutionrestfuls import bp as ibexecutionrestfuls_bp
+    app.register_blueprint(ibexecutionrestfuls_bp)
+
+    from app.ibsymbology import bp as ibsymbology_bp
+    app.register_blueprint(ibsymbology_bp)
+
 
     if not app.debug and not app.testing:
         app.logger.setLevel(logging.INFO)

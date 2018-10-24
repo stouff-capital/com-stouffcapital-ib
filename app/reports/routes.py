@@ -6,15 +6,18 @@ import csv
 import pandas as pd
 import numpy as np
 import requests
+import xmltodict
 from app import db
 from app.models import Contract, Bbg
 from app.reports import bp
 from app.contracts import routes as routes_contract
 from app.executions import routes as routes_executions
+from app.ibcontracts import routes as routes_ibcontract
 
 
 SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
 IB_FILE_LAST = 'MULTI_last.csv'
+IB_FQ_LAST = 'ws_discovery.xml'
 ALLOWED_EXTENSIONS = set(['csv'])
 
 # utilities
@@ -111,7 +114,6 @@ def ib_eod_data_informationsDuCompte():
         for data in list_informationsDuCompte:
             dict_informationsDuCompte[ data['Nom champ'] ] = data['Valeur champ']
 
-        #return df_informationsDuCompte
         return dict_informationsDuCompte
 
 
@@ -163,7 +165,6 @@ def ib_eod_data_changementsActifNet():
         for data in list_changementsActifNet:
             dict_changementsActifNet[ data['Nom champ'] ] = data['Valeur champ']
 
-        #return df_changementsActifNet
         return dict_changementsActifNet
 
 
@@ -563,6 +564,181 @@ def ib_upload_eod_report():
         file.save(os.path.join(SCRIPT_ROOT + '/data/', filename))
 
         return jsonify( {'status': 'ok', 'message': 'successfully uploaded'} )
+
+
+# autodnl with token
+@bp.route('/reports/ib/eod/v2', methods=['POST'])
+def ib_upload_eod_report_v2():
+    try:
+        data = request.get_json()
+    except:
+        return jsonify( {'status': 'error', 'error': 'missing token', 'controller': 'reports'} )
+
+    QUERY_ID = data['QUERY_ID']
+    TOKEN = data['TOKEN']
+    VERSION = '3'
+
+    res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest?t={TOKEN}&q={QUERY_ID}&v={VERSION}')
+
+    doc = xmltodict.parse(res.content)
+
+    if doc['FlexStatementResponse']['Status'] == 'Success':
+        REFERENCE_CODE = doc['FlexStatementResponse']['ReferenceCode']
+
+        res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?q={REFERENCE_CODE}&t={TOKEN}&v={VERSION}')
+        doc = xmltodict.parse(res.content)
+
+        dnl_report_try = 0
+        import time
+        # https://www.interactivebrokers.com/en/software/am/am/reports/version_3_error_codes.htm
+        while 'FlexStatementResponse' in doc and doc['FlexStatementResponse']['Status'] == 'Warn' and dnl_report_try < 5:
+                if doc['FlexStatementResponse']['ErrorCode'] == '1019':
+                    current_app.logger.info(f'flex query report not yet ready... please wait {dnl_report_try+1}')
+                    time.sleep(5)
+                    res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?q={REFERENCE_CODE}&t={TOKEN}&v={VERSION}')
+                    doc = xmltodict.parse(res.content)
+                    dnl_report_try += 1
+
+
+        with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'w') as file:
+            file.write(res.text)
+
+
+        if 'FlexQueryResponse' in doc:
+            # update Ibcontract
+            if len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 0:
+                pass # nothing to do, no statements
+            elif len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 1:
+                # cannot use loop
+                list_FlexStatements = [ doc['FlexQueryResponse']['FlexStatements']['FlexStatement'] ]
+            else:
+                list_FlexStatements = doc['FlexQueryResponse']['FlexStatements']['FlexStatement']
+
+            for FlexStatement in list_FlexStatements:
+                if len(FlexStatement['OpenPositions']['OpenPosition']) == 0:
+                    pass # nothing to do, no positions
+                elif len(FlexStatement['OpenPositions']['OpenPosition']) == 1:
+                    list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
+                else:
+                    list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
+
+
+                floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV']
+                intfields_OpenPosition = ['conid', 'multiplier', 'position']
+                datefields_OpenPosition = ['reportDate']
+                for OpenPosition in list_OpenPositions:
+                    api_OpenPosition = {}
+                    for key_OpenPosition in OpenPosition:
+                        if OpenPosition[key_OpenPosition] == '':
+                            pass
+                        else:
+                            if key_OpenPosition[1:] in floatfields_OpenPosition:
+                                api_OpenPosition[key_OpenPosition[1:]] = float(OpenPosition[key_OpenPosition])
+                            elif key_OpenPosition[1:] in intfields_OpenPosition:
+                                api_OpenPosition[key_OpenPosition[1:]] = int(OpenPosition[key_OpenPosition])
+                            elif key_OpenPosition[1:] in datefields_OpenPosition:
+                                api_OpenPosition[key_OpenPosition[1:]] = f'{OpenPosition[key_OpenPosition][0:4]}-{OpenPosition[key_OpenPosition][4:6]}-{OpenPosition[key_OpenPosition][6:]}'
+                            else:
+                                api_OpenPosition[key_OpenPosition[1:]] = OpenPosition[key_OpenPosition]
+
+                    print(api_OpenPosition)
+
+
+                    # transforme into ibcontract
+                    fields_Ibcontract = ['assetCategory', 'symbol', 'description', 'conid', 'isin', 'listingExchange', 'underlyingConid', 'underlyingSymbol', 'underlyingSecurityID', 'underlyingListingExchange', 'multiplier', 'strike', 'expiry', 'putCall', 'maturity', 'issueDate', 'underlyingCategory', 'subCategory', 'currency']
+                    api_Ibcontract = {}
+                    for key_Ibcontract in fields_Ibcontract:
+                        if key_Ibcontract in api_OpenPosition:
+                            api_Ibcontract[key_Ibcontract] = api_OpenPosition[key_Ibcontract]
+
+                    print(api_Ibcontract)
+                    routes_ibcontract.ibcontract_create_one(api_Ibcontract)
+
+
+
+        return jsonify( {'status': 'ok', 'message': 'ib:: successfully retrive flex query start of the day', 'controller': 'reports'} )
+    else:
+        print(doc)
+        return jsonify( {'status': 'error', 'error': 'unable to retrieve flex query', 'controller': 'reports'} )
+
+
+@bp.route('/reports/ib/eod/v2', methods=['GET'])
+def ib_report_eod_v2():
+    with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
+        doc = xmltodict.parse(fd.read())
+
+    if len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 0:
+        pass # nothing to do, no statements
+    elif len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 1:
+        # cannot use loop
+        list_FlexStatements = [ doc['FlexQueryResponse']['FlexStatements']['FlexStatement'] ]
+    else:
+        list_FlexStatements = doc['FlexQueryResponse']['FlexStatements']['FlexStatement']
+
+    data_openPositions = []
+    for FlexStatement in list_FlexStatements:
+        if len(FlexStatement['OpenPositions']['OpenPosition']) == 0:
+            pass # nothing to do, no positions
+        elif len(FlexStatement['OpenPositions']['OpenPosition']) == 1:
+            list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
+        else:
+            list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
+
+
+        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV']
+        intfields_OpenPosition = ['conid', 'multiplier', 'position']
+        datefields_OpenPosition = ['reportDate']
+
+        for OpenPosition in list_OpenPositions:
+            api_OpenPosition = {}
+            for key_OpenPosition in OpenPosition:
+                if OpenPosition[key_OpenPosition] == '':
+                    pass
+                else:
+                    if key_OpenPosition[1:] in floatfields_OpenPosition:
+                        api_OpenPosition[key_OpenPosition[1:]] = float(OpenPosition[key_OpenPosition])
+                    elif key_OpenPosition[1:] in intfields_OpenPosition:
+                        api_OpenPosition[key_OpenPosition[1:]] = int(OpenPosition[key_OpenPosition])
+                    elif key_OpenPosition[1:] in datefields_OpenPosition:
+                        api_OpenPosition[key_OpenPosition[1:]] = f'{OpenPosition[key_OpenPosition][0:4]}-{OpenPosition[key_OpenPosition][4:6]}-{OpenPosition[key_OpenPosition][6:]}'
+                    else:
+                        api_OpenPosition[key_OpenPosition[1:]] = OpenPosition[key_OpenPosition]
+
+            data_openPositions.append({
+                'provider': 'IB',
+                'strategy': api_OpenPosition['accountId'],
+                #'CUSTOM_accpbpid': f'{api_OpenPosition['accountId']}_IB_'
+                'position_current': api_OpenPosition['position'],
+                'pnl_d_local': 0,
+                'pnl_y_local': 0,
+                'pnl_y_eod_local': 0,
+                'position_eod': api_OpenPosition['position'],
+                'price_eod': api_OpenPosition['markPrice'],
+                'ntcf_d_local': 0,
+                'Symbole': api_OpenPosition['symbol'],
+                'conid': api_OpenPosition['conid'],
+            })
+
+    df_openPositions = pd.DataFrame(data_openPositions)
+
+    df_bridge = pd.read_sql(sql="SELECT * FROM ibsymbology", con=db.engine)
+
+    df_bridge.rename(columns={'ticker': 'bbg_ticker',
+                      'bbgIdentifier': 'Identifier',
+                      'bbgUnderylingId': 'bbg_underyling_id',
+                      'internalUnderlying': 'Underlying',
+                      'ibcontract_conid': 'conid', }
+             , inplace=True)
+
+    df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
+
+    # patch np.nan to json null
+    df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None)
+
+
+
+    return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions.to_dict(orient='records') } )
+
 
 
 @bp.route('/reports/ib/eod', methods=['GET'])

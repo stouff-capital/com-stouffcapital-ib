@@ -11,3 +11,4 @@ python-dateutil
 python-dotenv
 requests
 SQLAlchemy
+xmltodict
