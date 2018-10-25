@@ -156,6 +156,12 @@ def create_one():
     return ibexecutionrestfuls_insert_one(data)
 
 
+def ibexecutionrestfuls_insert_many(data):
+    for ibexecutionrestful in data:
+        ibexecutionrestfuls_insert_one(ibexecutionrestful)
+
+    return jsonify( {'status': 'ok', 'message': 'bulk', 'executions': len(data), 'controller': 'ibexecutionrestfuls'} )
+
 
 @bp.route('/ibexecutionrestfuls/bulk', methods=['POST'])
 def create_many():
@@ -167,7 +173,55 @@ def create_many():
     if data == None:
         return jsonify( {'status': 'error', 'error': 'missing data', 'controller': 'ibexecutionrestfuls'} )
 
-    for ibexecutionrestful in data:
-        ibexecutionrestfuls_insert_one(ibexecutionrestful)
+    return ibexecutionrestfuls_insert_many(data)
 
-    return jsonify( {'status': 'ok', 'message': 'bulk', 'executions': len(data), 'controller': 'ibexecutionrestfuls'} )
+
+@bp.route('/ibexecutionrestfuls/time/<date_str>', methods=['GET'])
+def list_limit_date(date_str):
+    ibexecutionrestfuls = Ibexecutionrestful.query.filter(Ibexecutionrestful.execution_m_time >= date_str).all()
+
+    execs = {} # dict with execId as key
+    for ibexecutionrestful in ibexecutionrestfuls:
+        one_exec = {}
+
+        one_exec['execution_m_execId'] = ibexecutionrestful.execution_m_execId
+        one_exec['execution_m_orderId'] = ibexecutionrestful.execution_m_orderId
+        one_exec['execution_m_time'] = ibexecutionrestful.execution_m_time
+        one_exec['execution_m_acctNumber'] = ibexecutionrestful.execution_m_acctNumber
+        one_exec['execution_m_exchange'] = ibexecutionrestful.execution_m_exchange
+        one_exec['execution_m_side'] = ibexecutionrestful.execution_m_side
+        one_exec['execution_m_shares'] = ibexecutionrestful.execution_m_shares  # execQty
+        one_exec['execution_m_cumQty'] = ibexecutionrestful.execution_m_cumQty
+        one_exec['execution_m_price'] = float(ibexecutionrestful.execution_m_price)
+        one_exec['execution_avgPrice'] = float(ibexecutionrestful.execution_avgPrice)
+        one_exec['execution_m_permId'] = ibexecutionrestful.execution_m_permId
+
+        one_exec['contract_m_symbol'] = ibexecutionrestful.contract_m_symbol
+        one_exec['contract_m_conId'] = ibexecutionrestful.contract_m_conId
+        one_exec['contract_m_secType'] = ibexecutionrestful.contract_m_secType
+        one_exec['contract_m_multiplier'] = int(ibexecutionrestful.contract_m_multiplier)
+        one_exec['contract_m_localSymbol'] = ibexecutionrestful.contract_m_localSymbol
+
+
+        one_exec['ibasset'] = {
+            'conid': ibexecutionrestful.ibasset.conid,
+            'symbol': ibexecutionrestful.ibasset.symbol,
+            'multiplier': int(ibexecutionrestful.ibasset.multiplier)
+        }
+        bloom = ibexecutionrestful.ibasset.bloom
+        if bloom != None:
+            one_exec['ibsymbology'] = {
+                'ticker': ibexecutionrestful.ibasset.bloom.ticker,
+                'bbgIdentifier': ibexecutionrestful.ibasset.bloom.bbgIdentifier,
+                'bbgUnderylingId': ibexecutionrestful.ibasset.bloom.bbgUnderylingId,
+                'internalUnderlying': ibexecutionrestful.ibasset.bloom.internalUnderlying
+            }
+        execs[ibexecutionrestful.execution_m_execId] = one_exec
+
+    return jsonify( {
+        'status': 'ok',
+        'time': date_str,
+        'count': len(ibexecutionrestfuls),
+        'executions': execs,
+        'controller': 'ibexecutionrestfuls'
+    } )
