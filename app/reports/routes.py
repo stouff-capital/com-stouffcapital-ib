@@ -8,7 +8,7 @@ import numpy as np
 import requests
 import xmltodict
 from app import db
-from app.models import Contract, Bbg
+from app.models import Contract, Bbg, Ibexecutionrestful
 from app.reports import bp
 from app.contracts import routes as routes_contract
 from app.executions import routes as routes_executions
@@ -645,6 +645,7 @@ def ib_upload_eod_report_v2():
                 list_FlexStatements = doc['FlexQueryResponse']['FlexStatements']['FlexStatement']
 
             for FlexStatement in list_FlexStatements:
+                reportDate_str = FlexStatement['EquitySummaryInBase']['EquitySummaryByReportDateInBase']['@reportDate']
                 if len(FlexStatement['OpenPositions']['OpenPosition']) == 0:
                     pass # nothing to do, no positions
                 elif len(FlexStatement['OpenPositions']['OpenPosition']) == 1:
@@ -684,9 +685,13 @@ def ib_upload_eod_report_v2():
                     print(api_Ibcontract)
                     routes_ibcontract.ibcontract_create_one(api_Ibcontract)
 
+        # clean former execs
+        current_app.logger.info(f'ib_upload_eod_report_v2:: clean former executions pool before {reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}')
+        db.session.query(Ibexecutionrestful).filter(Ibexecutionrestful.execution_m_time <= f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}' ).delete()
+        db.session.commit()
 
 
-        return jsonify( {'status': 'ok', 'message': 'ib:: successfully retrive flex query start of the day', 'controller': 'reports'} )
+        return jsonify( {'status': 'ok', 'message': 'ib:: successfully retrive flex query start of the day', 'reportDate': f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}', 'controller': 'reports'} )
     else:
         print(doc)
         return jsonify( {'status': 'error', 'error': 'unable to retrieve flex query', 'controller': 'reports'} )
