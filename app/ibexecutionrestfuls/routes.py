@@ -40,7 +40,7 @@ def ibexecutionrestfuls_insert_one(data):
                 multiplier = 1,
                 currency = data["contract"]["m_currency"]
             )
-        else: # derivative
+        elif data["contract"]["m_secType"] == "OPT":
             ibcontract = Ibcontract(
                 assetCategory = data["contract"]["m_secType"],
                 symbol = data["contract"]["m_localSymbol"],
@@ -56,6 +56,57 @@ def ibexecutionrestfuls_insert_one(data):
                 strike = strike,
                 expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
                 putCall = data["contract"]["m_right"],
+                currency = data["contract"]["m_currency"]
+            )
+        elif data["contract"]["m_secType"] == "FUT":
+            ibcontract = Ibcontract(
+                assetCategory = data["contract"]["m_secType"],
+                symbol = data["contract"]["m_localSymbol"],
+                # description -> in daily statement
+                conid = data["contract"]["m_conId"],
+                # isin -> in daily statement
+                listingExchange = data["contract"]["m_exchange"],
+                # underlyingConid -> in daily statement
+                underlyingSymbol = data["contract"]["m_symbol"],
+                # underlyingSecurityID
+                # underlyingListingExchange
+                multiplier =  float(data["contract"]["m_multiplier"]),
+                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
+                currency = data["contract"]["m_currency"]
+            )
+        elif data["contract"]["m_secType"] == "CFD":
+            ibcontract = Ibcontract(
+                assetCategory = data["contract"]["m_secType"],
+                symbol = data["contract"]["m_localSymbol"],
+                # description -> in daily statement
+                conid = data["contract"]["m_conId"],
+                # isin -> in daily statement
+                listingExchange = data["contract"]["m_exchange"],
+                # underlyingConid -> in daily statement
+                underlyingSymbol = data["contract"]["m_symbol"],
+                # underlyingSecurityID
+                # underlyingListingExchange
+                #multiplier =  float(data["contract"]["m_multiplier"]),
+                multiplier =  1,
+                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
+                currency = data["contract"]["m_currency"]
+            )
+        else:
+            ibcontract = Ibcontract(
+                assetCategory = data["contract"]["m_secType"],
+                symbol = data["contract"]["m_localSymbol"],
+                # description -> in daily statement
+                conid = data["contract"]["m_conId"],
+                # isin -> in daily statement
+                listingExchange = data["contract"]["m_exchange"],
+                # underlyingConid -> in daily statement
+                underlyingSymbol = data["contract"]["m_symbol"],
+                # underlyingSecurityID
+                # underlyingListingExchange
+                multiplier =  float(data["contract"]["m_multiplier"]),
+                #strike = strike,
+                #expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
+                #putCall = data["contract"]["m_right"],
                 currency = data["contract"]["m_currency"]
             )
 
@@ -95,8 +146,15 @@ def ibexecutionrestfuls_insert_one(data):
                 multiplier =  data["contract"]["m_multiplier"]
             listingExchange = data["contract"]["m_exchange"]
             underlyingSymbol = data["contract"]["m_symbol"]
-            strike =  float(data["contract"]["m_strike"])
-            expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d')
+            try:
+                strike =  float(data["contract"]["m_strike"])
+            except:
+                strike = None
+
+            try:
+                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d')
+            except:
+                expiry = None
             putCall = data["contract"]["m_right"]
 
 
@@ -199,14 +257,14 @@ def list_limit_date(date_str):
         one_exec['contract_m_symbol'] = ibexecutionrestful.contract_m_symbol
         one_exec['contract_m_conId'] = ibexecutionrestful.contract_m_conId
         one_exec['contract_m_secType'] = ibexecutionrestful.contract_m_secType
-        one_exec['contract_m_multiplier'] = int(ibexecutionrestful.contract_m_multiplier)
+        one_exec['contract_m_multiplier'] = 1 if ibexecutionrestful.contract_m_multiplier == None else int(ibexecutionrestful.contract_m_multiplier)
         one_exec['contract_m_localSymbol'] = ibexecutionrestful.contract_m_localSymbol
 
 
         one_exec['ibasset'] = {
             'conid': ibexecutionrestful.ibasset.conid,
             'symbol': ibexecutionrestful.ibasset.symbol,
-            'multiplier': int(ibexecutionrestful.ibasset.multiplier)
+            'multiplier': 1 if ibexecutionrestful.ibasset.multiplier == None else int(ibexecutionrestful.ibasset.multiplier)
         }
         bloom = ibexecutionrestful.ibasset.bloom
         if bloom != None:

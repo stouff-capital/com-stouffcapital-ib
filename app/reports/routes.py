@@ -567,26 +567,19 @@ def ib_upload_eod_report():
         return jsonify( {'status': 'ok', 'message': 'successfully uploaded', 'controller': 'reports'} )
 
 
+
+
+
+
 @bp.route('/reports/ib/eod/v2/reportDate', methods=['GET'])
 def ib_upload_eod_report_date_v2():
-    pass
     try:
         with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
             doc = xmltodict.parse( fd.read() )
     except:
         return jsonify({'status': 'error', 'error': f'{IB_FQ_LAST} not available', 'controller': 'reports'})
 
-
-    if 'FlexQueryResponse' in doc:
-        # update Ibcontract
-        if len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 0:
-            pass # nothing to do, no statements
-        elif len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 1:
-            # cannot use loop
-            list_FlexStatements = [ doc['FlexQueryResponse']['FlexStatements']['FlexStatement'] ]
-        else:
-            list_FlexStatements = doc['FlexQueryResponse']['FlexStatements']['FlexStatement']
-
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
     for FlexStatement in list_FlexStatements:
         reportDate_str = FlexStatement['EquitySummaryInBase']['EquitySummaryByReportDateInBase']['@reportDate']
         return jsonify( {'status': 'ok', 'reportDate': f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}', 'controller': 'reports'} )
@@ -615,13 +608,13 @@ def ib_upload_eod_report_v2():
         doc = xmltodict.parse(res.content)
 
         dnl_report_try = 0
-        dnl_report_retry = 10
+        dnl_report_retry = 6
         import time
         # https://www.interactivebrokers.com/en/software/am/am/reports/version_3_error_codes.htm
         while 'FlexStatementResponse' in doc and doc['FlexStatementResponse']['Status'] == 'Warn' and dnl_report_try < dnl_report_retry:
                 if doc['FlexStatementResponse']['ErrorCode'] == '1019':
                     current_app.logger.info(f'flex query report not yet ready... please wait {dnl_report_try+1}')
-                    time.sleep(5)
+                    time.sleep(10)
                     res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?q={REFERENCE_CODE}&t={TOKEN}&v={VERSION}')
                     doc = xmltodict.parse(res.content)
                     dnl_report_try += 1
@@ -636,23 +629,14 @@ def ib_upload_eod_report_v2():
 
         if 'FlexQueryResponse' in doc:
             # update Ibcontract
-            if len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 0:
-                pass # nothing to do, no statements
-            elif len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 1:
-                # cannot use loop
-                list_FlexStatements = [ doc['FlexQueryResponse']['FlexStatements']['FlexStatement'] ]
-            else:
-                list_FlexStatements = doc['FlexQueryResponse']['FlexStatements']['FlexStatement']
-
+            list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
             for FlexStatement in list_FlexStatements:
                 reportDate_str = FlexStatement['EquitySummaryInBase']['EquitySummaryByReportDateInBase']['@reportDate']
-                if len(FlexStatement['OpenPositions']['OpenPosition']) == 0:
-                    pass # nothing to do, no positions
-                elif len(FlexStatement['OpenPositions']['OpenPosition']) == 1:
-                    list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
-                else:
-                    list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
 
+                if isinstance( FlexStatement['OpenPositions']['OpenPosition'], list): # more than 1 item
+                    list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
+                else:
+                    list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
 
                 floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV']
                 intfields_OpenPosition = ['conid', 'multiplier', 'position']
@@ -702,24 +686,15 @@ def ib_report_eod_v2():
     with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
         doc = xmltodict.parse(fd.read())
 
-    if len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 0:
-        pass # nothing to do, no statements
-    elif len(doc['FlexQueryResponse']['FlexStatements']['FlexStatement']) == 1:
-        # cannot use loop
-        list_FlexStatements = [ doc['FlexQueryResponse']['FlexStatements']['FlexStatement'] ]
-    else:
-        list_FlexStatements = doc['FlexQueryResponse']['FlexStatements']['FlexStatement']
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
 
     data_openPositions = []
     distinct_positions = {}
     for FlexStatement in list_FlexStatements:
-        if len(FlexStatement['OpenPositions']['OpenPosition']) == 0:
-            pass # nothing to do, no positions
-        elif len(FlexStatement['OpenPositions']['OpenPosition']) == 1:
-            list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
-        else:
+        if isinstance( FlexStatement['OpenPositions']['OpenPosition'], list): # more than 1 item
             list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
-
+        else:
+            list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
 
         floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV']
         intfields_OpenPosition = ['conid', 'multiplier', 'position']
@@ -823,7 +798,7 @@ def ib_report_eod_v2():
                 'pnl_y_eod_local': 0,
                 'position_eod': 0,
                 'price_eod': 0,
-                'ntcf_d_local': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
+                'ntcf_d_local': -1 * ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
                 'Symbole': ibexecutionrestful['contract_m_symbol'],
                 'conid': ibexecutionrestful['contract_m_conId'],
             })
@@ -846,6 +821,247 @@ def ib_report_eod_v2():
     df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None)
 
     return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions.to_dict(orient='records') } )
+
+
+
+
+# daily statement blocs
+def ib_fq_dailyStatement_FlexStatements(doc):
+    if "FlexQueryResponse" in doc:
+        if isinstance( doc["FlexQueryResponse"]["FlexStatements"]["FlexStatement"], list): # more than 1 item
+            return doc["FlexQueryResponse"]["FlexStatements"]["FlexStatement"]
+        else:
+            return [ doc["FlexQueryResponse"]["FlexStatements"]["FlexStatement"] ]
+
+
+def ib_fq_dailyStatement_reportDate(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    for FlexStatement in list_FlexStatements:
+        reportDate_str = FlexStatement["EquitySummaryInBase"]["EquitySummaryByReportDateInBase"]["@reportDate"]
+
+        return f'{reportDate_str[0:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}'
+
+
+def ib_fq_dailyStatement_EquitysummaryInBase(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    reportDate = ib_fq_dailyStatement_reportDate(doc)
+    for FlexStatement in list_FlexStatements:
+
+        dict_data = {}
+        for dict_key in FlexStatement["EquitySummaryInBase"]["EquitySummaryByReportDateInBase"]:
+            dict_data[dict_key[1:]] = FlexStatement["EquitySummaryInBase"]["EquitySummaryByReportDateInBase"][dict_key]
+
+        # processing / transfo
+        dict_data["reportDate"] = reportDate
+
+        numFields = ['cash', 'brokerCashComponent', 'fdicInsuredBankSweepAccountCashComponent', 'slbCashCollateral', 'stock', 'slbDirectSecuritiesBorrowed', 'slbDirectSecuritiesLent', 'options', 'notes', 'funds', 'dividendAccruals', 'interestAccruals', 'brokerInterestAccrualsComponent', 'fdicInsuredAccountInterestAccrualsComponent', 'softDollars', 'forexCfdUnrealizedPl', 'cfdUnrealizedPl', 'total']
+        for numField in numFields:
+            dict_data[numField] = float(dict_data[numField])
+
+        data.append(dict_data)
+
+    return pd.DataFrame(data)
+
+
+def ib_fq_dailyStatement_CashReport(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    if len(list_FlexStatements) > 0:
+        reportDate = ib_fq_dailyStatement_reportDate(doc)
+        for FlexStatement in list_FlexStatements:
+
+            if isinstance( FlexStatement['CashReport']['CashReportCurrency'], list): # more than 1 item
+                list_CashReportCurrency = FlexStatement['CashReport']['CashReportCurrency']
+            else:
+                list_CashReportCurrency = [ FlexStatement['CashReport']['CashReportCurrency'] ]
+
+            for CashReportCurrency in list_CashReportCurrency:
+
+                if CashReportCurrency["@currency"] != 'BASE_SUMMARY':
+                    dict_data = {}
+                    for dict_key in CashReportCurrency:
+                        dict_data[dict_key[1:]] = CashReportCurrency[dict_key]
+
+                    dict_data['reportDate'] = reportDate
+
+                    del dict_data['fromDate']
+                    del dict_data['toDate']
+
+                    data.append(dict_data)
+
+    return pd.DataFrame(data)
+
+
+def ib_fq_dailyStatement_Trades(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    if len(list_FlexStatements) > 0:
+        reportDate = ib_fq_dailyStatement_reportDate(doc)
+        for FlexStatement in list_FlexStatements:
+            if 'Trades' in FlexStatement:
+                if FlexStatement['Trades'] is not None:
+
+                    if isinstance( FlexStatement['Trades']['Trade'], list): # more than 1 item
+                        list_Trades = FlexStatement['Trades']['Trade']
+                    else:
+                        list_Trades = [ FlexStatement['Trades']['Trade'] ]
+
+                    for Trade in list_Trades:
+                        dict_data = {}
+                        for dict_key in Trade:
+                            dict_data[dict_key[1:]] = Trade[dict_key]
+                        dict_data['reportDate'] = reportDate
+                        data.append(dict_data)
+
+    return pd.DataFrame(data)
+
+
+def ib_fq_TransactionTaxes(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    if len(list_FlexStatements) > 0:
+        reportDate = ib_fq_dailyStatement_reportDate(doc)
+        for FlexStatement in list_FlexStatements:
+            if 'TransactionTaxes' in FlexStatement:
+                if FlexStatement['TransactionTaxes'] is not None:
+
+                    if isinstance( FlexStatement['TransactionTaxes']['TransactionTax'], list): # more than 1 item
+                        list_TransactionTaxes = FlexStatement['TransactionTaxes']['TransactionTax']
+                    else:
+                        list_TransactionTaxes = [ FlexStatement['TransactionTaxes']['TransactionTax'] ]
+
+                    for TransactionTax in list_TransactionTaxes:
+                        dict_data = {}
+
+                        for dict_key in TransactionTax:
+                            dict_data[dict_key[1:]] = TransactionTax[dict_key]
+
+                        dict_data['reportDate'] = reportDate
+                        data.append(dict_data)
+
+    return pd.DataFrame(data)
+
+
+def ib_fq_CFDCharges(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    if len(list_FlexStatements) > 0:
+        reportDate = ib_fq_dailyStatement_reportDate(doc)
+        for FlexStatement in list_FlexStatements:
+            if 'CFDCharges' in FlexStatement:
+                if FlexStatement['CFDCharges'] is not None:
+                    if isinstance( FlexStatement['CFDCharges']['CFDCharge'], list): # more than 1 item
+                        list_CFDCharges = FlexStatement['CFDCharges']['CFDCharge']
+                    else:
+                        list_CFDCharges = [ FlexStatement['CFDCharges']['CFDCharge'] ]
+
+                    for CFDCharge in list_CFDCharges:
+                        dict_data = {}
+
+                        for dict_key in CFDCharge:
+                            dict_data[dict_key[1:]] = CFDCharge[dict_key]
+
+                        dict_data['reportDate'] = reportDate
+                        data.append(dict_data)
+
+    return pd.DataFrame(data)
+
+
+def ib_fq_InterestAccruals(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    if len(list_FlexStatements) > 0:
+        reportDate = ib_fq_dailyStatement_reportDate(doc)
+        for FlexStatement in list_FlexStatements:
+            if 'InterestAccruals' in FlexStatement:
+                if FlexStatement['InterestAccruals'] is not None:
+                    if isinstance( FlexStatement['InterestAccruals']['InterestAccrualsCurrency'], list): # more than 1 item
+                        list_InterestAccruals = FlexStatement['InterestAccruals']['InterestAccrualsCurrency']
+                    else:
+                        list_InterestAccruals = [ FlexStatement['InterestAccruals']['InterestAccrualsCurrency'] ]
+
+                    for InterestAccrualsCurrency in list_InterestAccruals:
+
+                        if InterestAccrualsCurrency['@currency'] != 'BASE_SUMMARY':
+                            dict_data = {}
+
+                            for dict_key in InterestAccrualsCurrency:
+                                dict_data[dict_key[1:]] = InterestAccrualsCurrency[dict_key]
+
+                            dict_data['reportDate'] = reportDate
+                            data.append(dict_data)
+
+    return pd.DataFrame(data)
+
+
+def ib_fq_ChangeInDividendAccruals(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    if len(list_FlexStatements) > 0:
+        reportDate = ib_fq_dailyStatement_reportDate(doc)
+        for FlexStatement in list_FlexStatements:
+            if 'ChangeInDividendAccruals' in FlexStatement:
+                if FlexStatement['ChangeInDividendAccruals'] is not None:
+                    if isinstance( FlexStatement['ChangeInDividendAccruals']['ChangeInDividendAccrual'], list): # more than 1 item
+                        list_ChangeInDividendAccruals = FlexStatement['ChangeInDividendAccruals']['ChangeInDividendAccrual']
+                    else:
+                        list_ChangeInDividendAccruals = [ FlexStatement['ChangeInDividendAccruals']['ChangeInDividendAccrual'] ]
+
+                    for ChangeInDividendAccrual in list_ChangeInDividendAccruals:
+                        dict_data = {}
+
+                        for dict_key in ChangeInDividendAccrual:
+                            dict_data[dict_key[1:]] = ChangeInDividendAccrual[dict_key]
+
+                        dict_data['reportDate'] = reportDate
+                        data.append(dict_data)
+
+    return pd.DataFrame(data)
+
+
+def ib_fq_ConversionRates(doc):
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    if len(list_FlexStatements) > 0:
+        reportDate = ib_fq_dailyStatement_reportDate(doc)
+        for FlexStatement in list_FlexStatements:
+            if 'ConversionRates' in FlexStatement:
+                if FlexStatement['ConversionRates'] is not None:
+                    if isinstance( FlexStatement['ConversionRates']['ConversionRate'], list): # more than 1 item
+                        list_ChangeInDividendAccruals = FlexStatement['ConversionRates']['ConversionRate']
+                    else:
+                        list_ChangeInDividendAccruals = [ FlexStatement['ConversionRates']['ConversionRate'] ]
+
+                    for ConversionRate in list_ChangeInDividendAccruals:
+                        dict_data = {}
+
+                        for dict_key in ConversionRate:
+                            dict_data[dict_key[1:]] = ConversionRate[dict_key]
+
+                        dict_data['reportDate'] = reportDate
+                        data.append(dict_data)
+
+    return pd.DataFrame(data)
 
 
 
