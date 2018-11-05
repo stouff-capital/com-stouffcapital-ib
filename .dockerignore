@@ -108,3 +108,4 @@ app.db
 com-stouffcapital-ib.log*
 
 app/reports/data/*.csv
+app/reports/data/*.xml

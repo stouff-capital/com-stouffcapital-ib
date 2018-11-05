@@ -799,7 +799,7 @@ def ib_report_eod_v2():
                 'position_eod': 0,
                 'price_eod': 0,
                 'ntcf_d_local': -1 * ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
-                'Symbole': ibexecutionrestful['contract_m_symbol'],
+                'Symbole': f'{ibexecutionrestful["contract_m_symbol"]}/{ibexecutionrestful["contract_m_localSymbol"]}',
                 'conid': ibexecutionrestful['contract_m_conId'],
             })
 

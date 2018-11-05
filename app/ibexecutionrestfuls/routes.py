@@ -88,7 +88,7 @@ def ibexecutionrestfuls_insert_one(data):
                 # underlyingListingExchange
                 #multiplier =  float(data["contract"]["m_multiplier"]),
                 multiplier =  1,
-                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
+                #expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'), # bug with CFD in USD
                 currency = data["contract"]["m_currency"]
             )
         else:
@@ -103,7 +103,7 @@ def ibexecutionrestfuls_insert_one(data):
                 underlyingSymbol = data["contract"]["m_symbol"],
                 # underlyingSecurityID
                 # underlyingListingExchange
-                multiplier =  float(data["contract"]["m_multiplier"]),
+                #multiplier =  float(data["contract"]["m_multiplier"]), # bug with cash
                 #strike = strike,
                 #expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
                 #putCall = data["contract"]["m_right"],
