@@ -62,5 +62,4 @@ End Function
 ```
 
 ## kubernetes deployment
-`kubectl create secret generic ib --from-literal=mysql-password=<pass> --from-literal=backend-user=<user> --from-literal=backend-password=<pass>`
-
+`kubectl create secret generic ib --from-literal=mysql-password=<pass> --from-literal=backend-user=<user> --from-literal=backend-password=<pass> --from-literal=sentry-sdk=<sentry_sdk>`

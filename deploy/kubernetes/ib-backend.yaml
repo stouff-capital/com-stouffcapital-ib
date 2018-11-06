@@ -50,6 +50,11 @@ spec:
             secretKeyRef:
               name: ib
               key: backend-password
+        - name: SENTRY_DSN
+          valueFrom:
+            secretKeyRef:
+              name: ib
+              key: sentry-sdk
         ports:
         - containerPort: 5000
           name: backend

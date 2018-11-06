@@ -13,3 +13,4 @@ class Config(object):
     BASIC_AUTH_USERNAME = os.environ.get('BASIC_AUTH_USERNAME')
     BASIC_AUTH_PASSWORD = os.environ.get('BASIC_AUTH_PASSWORD')
     BASIC_AUTH_FORCE = True
+    SENTRY_DSN = os.environ.get('SENTRY_DSN')

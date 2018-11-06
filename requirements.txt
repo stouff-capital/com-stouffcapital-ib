@@ -10,5 +10,6 @@ pandas
 python-dateutil
 python-dotenv
 requests
+sentry-sdk[flask]==0.5.3
 SQLAlchemy
 xmltodict

@@ -6,7 +6,15 @@ from flask_basicauth import BasicAuth
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
 from config import Config
+
+sentry_sdk.init(
+    dsn=Config.SENTRY_DSN,
+    integrations=[FlaskIntegration()]
+)
 
 basic_auth = BasicAuth()
 db = SQLAlchemy()
