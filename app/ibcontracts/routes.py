@@ -95,3 +95,23 @@ def ibcontract_create():
         return jsonify( {'status': 'error', 'error': 'missing data', 'controller': 'ibcontracts'} )
 
     return ibcontract_create_one(data)
+
+
+def ibcontracts_insert_many(data):
+    for ibcontract in data:
+        ibcontract_create_one(ibcontract)
+
+    return jsonify( {'status': 'ok', 'message': 'bulk', 'ibcontracts': len(data), 'controller': 'ibcontracts'} )
+
+
+@bp.route('/ibcontracts/bulk', methods=['POST'])
+def create_many():
+    try:
+        data = request.get_json()
+    except:
+        return jsonify( {'status': 'error', 'error': 'missing data', 'controller': 'ibcontracts'} )
+
+    if data == None:
+        return jsonify( {'status': 'error', 'error': 'missing data', 'controller': 'ibcontracts'} )
+
+    return ibcontracts_insert_many(data)

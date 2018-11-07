@@ -58,3 +58,10 @@ spec:
         ports:
         - containerPort: 5000
           name: backend
+        volumeMounts:
+        - name: ib-backend-persistent-storage
+          mountPath: /app/app/reports/data
+      volumes:
+      - name: ib-backend-persistent-storage
+        persistentVolumeClaim:
+          claimName: ib-backend-pv-claim
