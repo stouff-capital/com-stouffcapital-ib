@@ -628,46 +628,44 @@ def ib_upload_eod_report_v2():
 
 
         if 'FlexQueryResponse' in doc:
+
+            reportDate_str = ib_fq_dailyStatement_reportDate(doc).replace('-', '')
+
             # update Ibcontract
-            list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
-            for FlexStatement in list_FlexStatements:
-                reportDate_str = FlexStatement['EquitySummaryInBase']['EquitySummaryByReportDateInBase']['@reportDate']
+            df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
+            list_ibcontractsToCheck = []
+            fields_Ibcontract = ['assetCategory', 'symbol', 'description', 'conid', 'isin', 'listingExchange', 'underlyingConid', 'underlyingSymbol', 'underlyingSecurityID', 'underlyingListingExchange', 'multiplier', 'strike', 'expiry', 'putCall', 'maturity', 'issueDate', 'underlyingCategory', 'subCategory', 'currency']
+            for position in df_openPositions.to_dict(orient='records'):
+                # transforme into an ibcontract
+                api_Ibcontract = {}
+                for key_Ibcontract in fields_Ibcontract:
+                    if key_Ibcontract in position:
+                        api_Ibcontract[key_Ibcontract] = position[key_Ibcontract]
+                list_ibcontractsToCheck.append(api_Ibcontract)
 
-                if isinstance( FlexStatement['OpenPositions']['OpenPosition'], list): # more than 1 item
-                    list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
+                #print(api_Ibcontract)
+                #routes_ibcontract.ibcontract_create_one(api_Ibcontract)
+            routes_ibcontract.ibcontracts_insert_many(list_ibcontractsToCheck)
+
+
+            # create ibcontract from monthly perf
+            df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
+            dict_positions = {}
+            mtd_pnl = []
+            for position in df_MTDYTDPerformanceSummary.to_dict(orient='records'):
+                if position['conid'] not in dict_positions:
+                    dict_positions[ position['conid'] ] = position
+                    dict_positions[ position['conid'] ]['accountId'] = 'MULTI'
                 else:
-                    list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
+                    dict_positions[position['conid']]['mtmMTD'] = position['mtmMTD']
 
-                floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV']
-                intfields_OpenPosition = ['conid', 'multiplier', 'position']
-                datefields_OpenPosition = ['reportDate']
-                for OpenPosition in list_OpenPositions:
-                    api_OpenPosition = {}
-                    for key_OpenPosition in OpenPosition:
-                        if OpenPosition[key_OpenPosition] == '':
-                            pass
-                        else:
-                            if key_OpenPosition[1:] in floatfields_OpenPosition:
-                                api_OpenPosition[key_OpenPosition[1:]] = float(OpenPosition[key_OpenPosition])
-                            elif key_OpenPosition[1:] in intfields_OpenPosition:
-                                api_OpenPosition[key_OpenPosition[1:]] = int(OpenPosition[key_OpenPosition])
-                            elif key_OpenPosition[1:] in datefields_OpenPosition:
-                                api_OpenPosition[key_OpenPosition[1:]] = f'{OpenPosition[key_OpenPosition][0:4]}-{OpenPosition[key_OpenPosition][4:6]}-{OpenPosition[key_OpenPosition][6:]}'
-                            else:
-                                api_OpenPosition[key_OpenPosition[1:]] = OpenPosition[key_OpenPosition]
+            for position in dict_positions:
+                mtd_pnl.append(dict_positions[position])
+            df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
 
-                    print(api_OpenPosition)
+            routes_ibcontract.ibcontracts_insert_many(mtd_pnl)
 
 
-                    # transforme into ibcontract
-                    fields_Ibcontract = ['assetCategory', 'symbol', 'description', 'conid', 'isin', 'listingExchange', 'underlyingConid', 'underlyingSymbol', 'underlyingSecurityID', 'underlyingListingExchange', 'multiplier', 'strike', 'expiry', 'putCall', 'maturity', 'issueDate', 'underlyingCategory', 'subCategory', 'currency']
-                    api_Ibcontract = {}
-                    for key_Ibcontract in fields_Ibcontract:
-                        if key_Ibcontract in api_OpenPosition:
-                            api_Ibcontract[key_Ibcontract] = api_OpenPosition[key_Ibcontract]
-
-                    print(api_Ibcontract)
-                    routes_ibcontract.ibcontract_create_one(api_Ibcontract)
 
         # clean former execs
         current_app.logger.info(f'ib_upload_eod_report_v2:: clean former executions pool before {reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}')
@@ -683,69 +681,12 @@ def ib_upload_eod_report_v2():
 
 @bp.route('/reports/ib/eod/v2', methods=['GET'])
 def ib_report_eod_v2():
+
     with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
         doc = xmltodict.parse(fd.read())
 
-    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+    df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
 
-    data_openPositions = []
-    distinct_positions = {}
-    for FlexStatement in list_FlexStatements:
-        if isinstance( FlexStatement['OpenPositions']['OpenPosition'], list): # more than 1 item
-            list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
-        else:
-            list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
-
-        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV']
-        intfields_OpenPosition = ['conid', 'multiplier', 'position']
-        datefields_OpenPosition = ['reportDate']
-
-
-        for OpenPosition in list_OpenPositions:
-            api_OpenPosition = {}
-            for key_OpenPosition in OpenPosition:
-                if OpenPosition[key_OpenPosition] == '':
-                    pass
-                else:
-                    if key_OpenPosition[1:] in floatfields_OpenPosition:
-                        api_OpenPosition[key_OpenPosition[1:]] = float(OpenPosition[key_OpenPosition])
-                    elif key_OpenPosition[1:] in intfields_OpenPosition:
-                        api_OpenPosition[key_OpenPosition[1:]] = int(OpenPosition[key_OpenPosition])
-                    elif key_OpenPosition[1:] in datefields_OpenPosition:
-                        api_OpenPosition[key_OpenPosition[1:]] = f'{OpenPosition[key_OpenPosition][0:4]}-{OpenPosition[key_OpenPosition][4:6]}-{OpenPosition[key_OpenPosition][6:]}'
-                    else:
-                        api_OpenPosition[key_OpenPosition[1:]] = OpenPosition[key_OpenPosition]
-
-            if api_OpenPosition['conid'] in distinct_positions:
-                # merge
-                for openPosition in data_openPositions:
-                    if openPosition['conid'] == api_OpenPosition['conid']:
-                        openPosition['position_current'] += api_OpenPosition['position']
-                        openPosition['position_eod'] += api_OpenPosition['position']
-
-                        distinct_positions[ api_OpenPosition['conid'] ] += 1
-
-                        if openPosition['price_eod'] != api_OpenPosition['markPrice']:
-                            current_app.logger.warning(f'ib_report_eod_v2:: merge 2 positions {data["conid"]} with different eod prices.')
-            else:
-                data_openPositions.append({
-                    'provider': 'IB',
-                    #'strategy': api_OpenPosition['accountId'],
-                    'strategy': "MULTI",
-                    'position_current': api_OpenPosition['position'],
-                    'pnl_d_local': 0,
-                    'pnl_y_local': 0,
-                    'pnl_y_eod_local': 0,
-                    'position_eod': api_OpenPosition['position'],
-                    'price_eod': api_OpenPosition['markPrice'],
-                    'ntcf_d_local': 0,
-                    'Symbole': api_OpenPosition['symbol'],
-                    'conid': api_OpenPosition['conid'],
-                })
-
-                distinct_positions[ api_OpenPosition['conid'] ] = 1
-
-    df_openPositions = pd.DataFrame(data_openPositions)
 
     # inject intraday executions
     list_openPositions = df_openPositions.to_dict(orient='record')
@@ -805,6 +746,51 @@ def ib_report_eod_v2():
 
 
     df_openPositions = pd.DataFrame(list_openPositions)
+
+
+    # inject monthly pnl in base currency - ibcontracts are created with flex query results are retrieved
+    df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
+    dict_positions = {}
+    mtd_pnl = []
+    for position in df_MTDYTDPerformanceSummary.to_dict(orient='records'):
+        if position['conid'] not in dict_positions:
+            dict_positions[ position['conid'] ] = position
+            dict_positions[ position['conid'] ]['accountId'] = 'MULTI'
+        else:
+            dict_positions[position['conid']]['mtmMTD'] = position['mtmMTD']
+
+    for position in dict_positions:
+        mtd_pnl.append(dict_positions[position])
+    df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
+
+    list_openPositions = df_openPositions.to_dict(orient='record')
+
+    for monthly_pnl in df_MTDYTDPerformanceSummary.to_dict(orient='record'):
+        found_in_daily_statement = False
+        for openPosition in list_openPositions:
+            if monthly_pnl['conid'] == openPosition['conid']:
+                found_in_daily_statement = True
+                openPosition['pnl_m_eod_base'] = monthly_pnl['mtmMTD']
+                break
+
+        if found_in_daily_statement == False:
+            list_openPositions.append({
+                'provider': 'IB',
+                'strategy': "MULTI",
+                'position_current': 0,
+                'pnl_d_local': 0,
+                'pnl_y_local': 0,
+                'pnl_y_eod_local': 0,
+                'position_eod': 0,
+                'price_eod': 0,
+                'ntcf_d_local': 0,
+                'pnl_m_eod_base': monthly_pnl['mtmMTD'],
+                'Symbole': f'{monthly_pnl["symbol"]}',
+                'conid': monthly_pnl['conid'],
+            })
+
+    df_openPositions = pd.DataFrame(list_openPositions)
+
 
     df_bridge = pd.read_sql(sql="SELECT * FROM ibsymbology", con=db.engine)
 
@@ -869,6 +855,51 @@ def ib_fq_dailyStatement_EquitysummaryInBase(doc):
     return pd.DataFrame(data)
 
 
+def ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc):
+
+    data = []
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    if len(list_FlexStatements) > 0:
+        reportDate = ib_fq_dailyStatement_reportDate(doc)
+        for FlexStatement in list_FlexStatements:
+
+            if isinstance( FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying'], list): # more than 1 item
+                list_MTDYTDPerformanceSummaryUnderlying = FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying']
+            else:
+                list_MTDYTDPerformanceSummaryUnderlying = [ FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying'] ]
+
+            for MTDYTDPerformanceSummaryUnderlying in list_MTDYTDPerformanceSummaryUnderlying:
+
+                if MTDYTDPerformanceSummaryUnderlying['@description'] != 'Total' and  MTDYTDPerformanceSummaryUnderlying['@conid'] != '' :
+                    dict_data = {}
+                    for dict_key in MTDYTDPerformanceSummaryUnderlying:
+                        dict_data[dict_key[1:]] = MTDYTDPerformanceSummaryUnderlying[dict_key]
+
+                    int_fields = ['conid', 'multiplier']
+                    for field in int_fields:
+                        try:
+                            dict_data[field] = int(dict_data[field])
+                        except:
+                            dict_data[field] = None
+
+                    float_fields = ['mtmMTD']
+                    for field in float_fields:
+                        try:
+                            dict_data[field] = float(dict_data[field])
+                        except:
+                            dict_data[field] = None
+
+                    dict_data['reportDate'] = reportDate
+
+
+                    data.append(dict_data)
+
+    return pd.DataFrame(data)
+
+
+
 def ib_fq_dailyStatement_CashReport(doc):
     data = []
 
@@ -898,6 +929,71 @@ def ib_fq_dailyStatement_CashReport(doc):
                     data.append(dict_data)
 
     return pd.DataFrame(data)
+
+
+def ib_fq_dailyStatement_OpenPositions(doc):
+
+    list_FlexStatements = ib_fq_dailyStatement_FlexStatements(doc)
+
+    data_openPositions = []
+    distinct_positions = {}
+    for FlexStatement in list_FlexStatements:
+        if isinstance( FlexStatement['OpenPositions']['OpenPosition'], list): # more than 1 item
+            list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
+        else:
+            list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
+
+        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV']
+        intfields_OpenPosition = ['conid', 'multiplier', 'position']
+        datefields_OpenPosition = ['reportDate']
+
+
+        for OpenPosition in list_OpenPositions:
+            api_OpenPosition = {}
+            for key_OpenPosition in OpenPosition:
+                if OpenPosition[key_OpenPosition] == '':
+                    pass
+                else:
+                    if key_OpenPosition[1:] in floatfields_OpenPosition:
+                        api_OpenPosition[key_OpenPosition[1:]] = float(OpenPosition[key_OpenPosition])
+                    elif key_OpenPosition[1:] in intfields_OpenPosition:
+                        api_OpenPosition[key_OpenPosition[1:]] = int(OpenPosition[key_OpenPosition])
+                    elif key_OpenPosition[1:] in datefields_OpenPosition:
+                        api_OpenPosition[key_OpenPosition[1:]] = f'{OpenPosition[key_OpenPosition][0:4]}-{OpenPosition[key_OpenPosition][4:6]}-{OpenPosition[key_OpenPosition][6:]}'
+                    else:
+                        api_OpenPosition[key_OpenPosition[1:]] = OpenPosition[key_OpenPosition]
+
+            if api_OpenPosition['conid'] in distinct_positions:
+                # merge
+                for openPosition in data_openPositions:
+                    if openPosition['conid'] == api_OpenPosition['conid']:
+                        openPosition['position_current'] += api_OpenPosition['position']
+                        openPosition['position_eod'] += api_OpenPosition['position']
+
+                        distinct_positions[ api_OpenPosition['conid'] ] += 1
+
+                        if openPosition['price_eod'] != api_OpenPosition['markPrice']:
+                            current_app.logger.warning(f'ib_report_eod_v2:: merge 2 positions {data["conid"]} with different eod prices.')
+            else:
+                data_openPositions.append({
+                    'provider': 'IB',
+                    #'strategy': api_OpenPosition['accountId'],
+                    'strategy': "MULTI",
+                    'position_current': api_OpenPosition['position'],
+                    'pnl_d_local': 0,
+                    'pnl_y_local': 0,
+                    'pnl_y_eod_local': 0,
+                    'position_eod': api_OpenPosition['position'],
+                    'price_eod': api_OpenPosition['markPrice'],
+                    'ntcf_d_local': 0,
+                    'Symbole': api_OpenPosition['symbol'],
+                    'conid': api_OpenPosition['conid'],
+                })
+
+                distinct_positions[ api_OpenPosition['conid'] ] = 1
+
+    return pd.DataFrame(data_openPositions)
+
 
 
 def ib_fq_dailyStatement_Trades(doc):

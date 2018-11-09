@@ -23,92 +23,159 @@ def ibexecutionrestfuls_insert_one(data):
         current_app.logger.info(f'controller: ibexecutionrestfuls, existing contract: {data["contract"]["m_conId"]}')
     else:
         current_app.logger.info(f'controller: ibexecutionrestfuls, missing contract: {data["contract"]["m_conId"]} will be added now')
-        if data["contract"]["m_strike"] > 0:
+
+        if "m_secType" in data["contract"] and data["contract"]["m_secType"] != '':
+            assetCategory = data["contract"]["m_secType"]
+        else:
+            assetCategory = None
+
+
+        if ( "m_secType" in data["contract"] and data["contract"]["m_secType"] == "STK" and "m_symbol" in data["contract"] ):
+            symbol = data["contract"]["m_symbol"]
+            underlyingSymbol = data["contract"]["m_symbol"]
+        elif 'm_localSymbol' in data["contract"] and data["contract"]["m_localSymbol"] != '':
+            symbol = data["contract"] and data["contract"]["m_localSymbol"]
+
+            if 'm_symbol' in data["contract"]:
+                underlyingSymbol = data["contract"]["m_symbol"]
+        else:
+            symbol = None
+
+
+        if "m_description" in data["contract"]:
+            description = data["contract"]["m_description"]
+        else:
+            description = None
+
+
+        conid = int(data["contract"]["m_conId"])
+
+
+        if "m_isin" in data["contract"]:
+            isin = data["contract"]["m_isin"]
+        else:
+            isin = None
+
+
+        if "m_listingExchange" in data["contract"]  and ( "m_secType" in data["contract"] and data["contract"]["m_secType"] != "STK" ) :
+            listingExchange = data["contract"]["m_listingExchange"]
+        else:
+            listingExchange = None
+
+
+        if "m_underlyingConid" in data["contract"]:
+            underlyingConid = data["contract"]["m_underlyingConid"]
+        else:
+            underlyingConid = None
+
+
+        if "m_underlyingSecurityID" in data["contract"]:
+            underlyingSecurityID = data["contract"]["m_underlyingSecurityID"]
+        else:
+            underlyingSecurityID = None
+
+
+        if "m_underlyingListingExchange" in data["contract"]:
+            underlyingListingExchange = data["contract"]["m_underlyingListingExchange"]
+        else:
+            underlyingListingExchange = None
+
+
+        if "m_multiplier" in data["contract"]:
+            multiplier =  float(data["contract"]["m_multiplier"]),
+        else:
+            multiplier = 1
+
+
+        if "m_strike" in data["contract"] and data["contract"]["m_strike"] != '' and data["contract"]["m_strike"] > 0:
             strike = float(data["contract"]["m_strike"])
         else:
             strike = None
 
 
-        if data["contract"]["m_secType"] == "STK":
-            ibcontract = Ibcontract(
-                assetCategory = data["contract"]["m_secType"],
-                symbol = data["contract"]["m_symbol"],
-                # description -> in daily statement
-                conid = data["contract"]["m_conId"],
-                # isin -> in daily statement
-                # listingExchange -> data quality issue for stock
-                multiplier = 1,
-                currency = data["contract"]["m_currency"]
-            )
-        elif data["contract"]["m_secType"] == "OPT":
-            ibcontract = Ibcontract(
-                assetCategory = data["contract"]["m_secType"],
-                symbol = data["contract"]["m_localSymbol"],
-                # description -> in daily statement
-                conid = data["contract"]["m_conId"],
-                # isin -> in daily statement
-                listingExchange = data["contract"]["m_exchange"],
-                # underlyingConid -> in daily statement
-                underlyingSymbol = data["contract"]["m_symbol"],
-                # underlyingSecurityID
-                # underlyingListingExchange
-                multiplier =  float(data["contract"]["m_multiplier"]),
-                strike = strike,
-                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
-                putCall = data["contract"]["m_right"],
-                currency = data["contract"]["m_currency"]
-            )
-        elif data["contract"]["m_secType"] == "FUT":
-            ibcontract = Ibcontract(
-                assetCategory = data["contract"]["m_secType"],
-                symbol = data["contract"]["m_localSymbol"],
-                # description -> in daily statement
-                conid = data["contract"]["m_conId"],
-                # isin -> in daily statement
-                listingExchange = data["contract"]["m_exchange"],
-                # underlyingConid -> in daily statement
-                underlyingSymbol = data["contract"]["m_symbol"],
-                # underlyingSecurityID
-                # underlyingListingExchange
-                multiplier =  float(data["contract"]["m_multiplier"]),
-                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
-                currency = data["contract"]["m_currency"]
-            )
-        elif data["contract"]["m_secType"] == "CFD":
-            ibcontract = Ibcontract(
-                assetCategory = data["contract"]["m_secType"],
-                symbol = data["contract"]["m_localSymbol"],
-                # description -> in daily statement
-                conid = data["contract"]["m_conId"],
-                # isin -> in daily statement
-                listingExchange = data["contract"]["m_exchange"],
-                # underlyingConid -> in daily statement
-                underlyingSymbol = data["contract"]["m_symbol"],
-                # underlyingSecurityID
-                # underlyingListingExchange
-                #multiplier =  float(data["contract"]["m_multiplier"]),
-                multiplier =  1,
-                #expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'), # bug with CFD in USD
-                currency = data["contract"]["m_currency"]
-            )
+        if "m_expiry" in data["contract"] and data["contract"]["m_expiry"] != '':
+            if len(data["contract"]["m_expiry"]) == 8:
+                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d')
+            elif len(data["contract"]["m_expiry"]) == 10:
+                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y-%m-%d')
+            else:
+                expiry = None
         else:
-            ibcontract = Ibcontract(
-                assetCategory = data["contract"]["m_secType"],
-                symbol = data["contract"]["m_localSymbol"],
-                # description -> in daily statement
-                conid = data["contract"]["m_conId"],
-                # isin -> in daily statement
-                listingExchange = data["contract"]["m_exchange"],
-                # underlyingConid -> in daily statement
-                underlyingSymbol = data["contract"]["m_symbol"],
-                # underlyingSecurityID
-                # underlyingListingExchange
-                #multiplier =  float(data["contract"]["m_multiplier"]), # bug with cash
-                #strike = strike,
-                #expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d'),
-                #putCall = data["contract"]["m_right"],
-                currency = data["contract"]["m_currency"]
-            )
+            expiry = None
+
+
+        if "m_right" in data["contract"] and data["contract"]["m_right"] != '' and (data["contract"]["m_right"].upper() == 'C' or data["contract"]["m_right"].upper() == 'P'):
+            putCall = data["contract"]["m_right"]
+        elif "m_putCall" in data["contract"] and data["contract"]["m_putCall"] != '' and (data["contract"]["m_putCall"].upper() == 'C' or data["contract"]["m_putCall"].upper() == 'P'):
+            putCall = data["contract"]["m_putCall"]
+        else:
+            putCall = None
+
+
+        if "m_maturity" in data["contract"] and data["contract"]["m_maturity"] != '':
+            if len(data["contract"]["m_maturity"]) == 8:
+                maturity = datetime.datetime.strptime(data["contract"]["m_maturity"], '%Y%m%d')
+            elif len(data["contract"]["m_maturity"]) == 10:
+                maturity = datetime.datetime.strptime(data["contract"]["m_maturity"], '%Y-%m-%d')
+            else:
+                maturity = None
+        else:
+            maturity = None
+
+
+        if "m_issueDate" in data["contract"] and data["contract"]["m_issueDate"] != '':
+            if len(data["contract"]["m_issueDate"]) == 8:
+                issueDate = datetime.datetime.strptime(data["contract"]["m_issueDate"], '%Y%m%d')
+            elif len(data["contract"]["m_maturity"]) == 10:
+                issueDate = datetime.datetime.strptime(data["contract"]["m_issueDate"], '%Y-%m-%d')
+            else:
+                issueDate = None
+        else:
+            issueDate = None
+
+
+        if "m_underlyingCategory" in data["contract"] and data["contract"]["m_underlyingCategory"] != '':
+            underlyingCategory = data["contract"]["m_underlyingCategory"]
+        else:
+            underlyingCategory = None
+
+
+        if "m_subCategory" in data["contract"] and data["contract"]["m_subCategory"] != '':
+            subCategory = data["contract"]["m_subCategory"]
+        else:
+            subCategory = None
+
+
+        if "m_currency" in data["contract"] and data["contract"]["m_currency"] != '':
+            currency = data["contract"]["m_currency"]
+        else:
+            currency = None
+
+
+        ibcontract = Ibcontract(
+            assetCategory  = assetCategory,
+            symbol = symbol,
+            description = description,
+            conid = conid,
+            isin = isin,
+            listingExchange = listingExchange,
+            underlyingConid = underlyingConid,
+            underlyingSymbol = underlyingSymbol,
+            underlyingSecurityID = underlyingSecurityID,
+            underlyingListingExchange = underlyingListingExchange,
+            multiplier = multiplier,
+            strike = strike,
+            expiry = expiry,
+            putCall = putCall,
+            maturity = maturity,
+            issueDate = issueDate,
+            underlyingCategory = underlyingCategory,
+            subCategory = subCategory,
+            currency = currency
+        )
+
+
+
 
         db.session.add(ibcontract)
         db.session.commit()
@@ -129,33 +196,6 @@ def ibexecutionrestfuls_insert_one(data):
         elif data["execution"]["m_side"][0].upper() == 'S':
             shares = -shares
             cumQty = -cumQty
-
-        if data["contract"]["m_secType"] == "STK":
-            symbol = data["contract"]["m_symbol"]
-            multiplier = 1
-            listingExchange = None
-            underlyingSymbol = None
-            strike = None
-            expiry = None
-            putCall = None
-        else:
-            symbol = data["contract"]["m_localSymbol"]
-            try:
-                multiplier =  float(data["contract"]["m_multiplier"])
-            except:
-                multiplier =  data["contract"]["m_multiplier"]
-            listingExchange = data["contract"]["m_exchange"]
-            underlyingSymbol = data["contract"]["m_symbol"]
-            try:
-                strike =  float(data["contract"]["m_strike"])
-            except:
-                strike = None
-
-            try:
-                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d')
-            except:
-                expiry = None
-            putCall = data["contract"]["m_right"]
 
 
         ibexecutionrestful = Ibexecutionrestful(
