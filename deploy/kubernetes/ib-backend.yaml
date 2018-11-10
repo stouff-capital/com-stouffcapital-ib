@@ -60,7 +60,7 @@ spec:
           name: backend
         volumeMounts:
         - name: ib-backend-persistent-storage
-          mountPath: /app/app/reports/data
+          mountPath: /app/reports/data
       volumes:
       - name: ib-backend-persistent-storage
         persistentVolumeClaim:
