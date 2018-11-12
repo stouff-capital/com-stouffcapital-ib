@@ -24,13 +24,13 @@ def ibexecutionrestfuls_insert_one(data):
     else:
         current_app.logger.info(f'controller: ibexecutionrestfuls, missing contract: {data["contract"]["m_conId"]} will be added now')
 
-        if "m_secType" in data["contract"] and data["contract"]["m_secType"] != '':
+        if "m_secType" in data["contract"] and data["contract"]["m_secType"] is not None and data["contract"]["m_secType"] != '':
             assetCategory = data["contract"]["m_secType"]
         else:
             assetCategory = None
 
 
-        if ( "m_secType" in data["contract"] and data["contract"]["m_secType"] == "STK" and "m_symbol" in data["contract"] ):
+        if ( "m_secType" in data["contract"] and data["contract"]["m_secType"] is not None and data["contract"]["m_secType"] == "STK" and "m_symbol" in data["contract"] ):
             symbol = data["contract"]["m_symbol"]
             underlyingSymbol = data["contract"]["m_symbol"]
         elif 'm_localSymbol' in data["contract"] and data["contract"]["m_localSymbol"] != '':
@@ -42,7 +42,7 @@ def ibexecutionrestfuls_insert_one(data):
             symbol = None
 
 
-        if "m_description" in data["contract"]:
+        if "m_description" in data["contract"] and data["contract"]["m_description"] is not None and data["contract"]["m_description"] != "":
             description = data["contract"]["m_description"]
         else:
             description = None
@@ -51,106 +51,120 @@ def ibexecutionrestfuls_insert_one(data):
         conid = int(data["contract"]["m_conId"])
 
 
-        if "m_isin" in data["contract"]:
+        if "m_isin" in data["contract"] and data["contract"]["m_isin"] is not None and data["contract"]["m_isin"] != "":
             isin = data["contract"]["m_isin"]
         else:
             isin = None
 
 
-        if "m_listingExchange" in data["contract"]  and ( "m_secType" in data["contract"] and data["contract"]["m_secType"] != "STK" ) :
+        if "m_listingExchange" in data["contract"] and data["contract"]["m_listingExchange"] is not None and ( "m_secType" in data["contract"] and data["contract"]["m_secType"] is not None and data["contract"]["m_secType"] != "STK" ) :
             listingExchange = data["contract"]["m_listingExchange"]
         else:
             listingExchange = None
 
 
-        if "m_underlyingConid" in data["contract"]:
+        if "m_underlyingConid" in data["contract"] and data["contract"]["m_underlyingConid"] is not None and data["contract"]["m_underlyingConid"] != "":
             underlyingConid = data["contract"]["m_underlyingConid"]
         else:
             underlyingConid = None
 
 
-        if "m_underlyingSecurityID" in data["contract"]:
+        if "m_underlyingSecurityID" in data["contract"] and data["contract"]["m_underlyingSecurityID"] is not None and data["contract"]["m_underlyingSecurityID"] != "":
             underlyingSecurityID = data["contract"]["m_underlyingSecurityID"]
         else:
             underlyingSecurityID = None
 
 
-        if "m_underlyingListingExchange" in data["contract"]:
+        if "m_underlyingListingExchange" in data["contract"] and data["contract"]["m_underlyingListingExchange"] is not None and data["contract"]["m_underlyingListingExchange"] != "":
             underlyingListingExchange = data["contract"]["m_underlyingListingExchange"]
         else:
             underlyingListingExchange = None
 
 
-        if "m_multiplier" in data["contract"]:
-            multiplier =  float(data["contract"]["m_multiplier"]),
+        if "m_multiplier" in data["contract"] and data["contract"]["m_multiplier"] is not None and data["contract"]["m_multiplier"] != '' :
+            try:
+                multiplier =  float( data["contract"]["m_multiplier"] )
+            except:
+                multiplier = 1
         else:
             multiplier = 1
 
 
-        if "m_strike" in data["contract"] and data["contract"]["m_strike"] != '' and data["contract"]["m_strike"] > 0:
-            strike = float(data["contract"]["m_strike"])
+        if "m_strike" in data["contract"] and data["contract"]["m_strike"] is not None and data["contract"]["m_strike"] != '' and data["contract"]["m_strike"] > 0:
+            try:
+                strike = float( data["contract"]["m_strike"] )
+            except:
+                strike = None
         else:
             strike = None
 
 
-        if "m_expiry" in data["contract"] and data["contract"]["m_expiry"] != '':
-            if len(data["contract"]["m_expiry"]) == 8:
-                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d')
-            elif len(data["contract"]["m_expiry"]) == 10:
-                expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y-%m-%d')
-            else:
+        if "m_expiry" in data["contract"] and data["contract"]["m_expiry"] is not None and data["contract"]["m_expiry"] != '':
+            try:
+                if len( data["contract"]["m_expiry"] ) == 8:
+                    expiry = datetime.datetime.strptime( data["contract"]["m_expiry"], '%Y%m%d' )
+                elif len( data["contract"]["m_expiry"] ) == 10:
+                    expiry = datetime.datetime.strptime( data["contract"]["m_expiry"], '%Y-%m-%d' )
+                else:
+                    expiry = None
+            except:
                 expiry = None
         else:
             expiry = None
 
 
-        if "m_right" in data["contract"] and data["contract"]["m_right"] != '' and (data["contract"]["m_right"].upper() == 'C' or data["contract"]["m_right"].upper() == 'P'):
+        if "m_right" in data["contract"] and data["contract"]["m_right"] is not None and data["contract"]["m_right"] != '' and (data["contract"]["m_right"][:1].upper() == 'C' or data["contract"]["m_right"][:1].upper() == 'P'):
             putCall = data["contract"]["m_right"]
-        elif "m_putCall" in data["contract"] and data["contract"]["m_putCall"] != '' and (data["contract"]["m_putCall"].upper() == 'C' or data["contract"]["m_putCall"].upper() == 'P'):
+        elif "m_putCall" in data["contract"] and data["contract"]["m_putCall"] is not None and data["contract"]["m_putCall"] != '' and (data["contract"]["m_putCall"][:1].upper() == 'C' or data["contract"]["m_putCall"][:1].upper() == 'P'):
             putCall = data["contract"]["m_putCall"]
         else:
             putCall = None
 
 
-        if "m_maturity" in data["contract"] and data["contract"]["m_maturity"] != '':
-            if len(data["contract"]["m_maturity"]) == 8:
-                maturity = datetime.datetime.strptime(data["contract"]["m_maturity"], '%Y%m%d')
-            elif len(data["contract"]["m_maturity"]) == 10:
-                maturity = datetime.datetime.strptime(data["contract"]["m_maturity"], '%Y-%m-%d')
-            else:
+        if "m_maturity" in data["contract"] and data["contract"]["m_maturity"] is not None and data["contract"]["m_maturity"] != '':
+            try:
+                if len(data["contract"]["m_maturity"]) == 8:
+                    maturity = datetime.datetime.strptime(data["contract"]["m_maturity"], '%Y%m%d')
+                elif len(data["contract"]["m_maturity"]) == 10:
+                    maturity = datetime.datetime.strptime(data["contract"]["m_maturity"], '%Y-%m-%d')
+                else:
+                    maturity = None
+            except:
                 maturity = None
         else:
             maturity = None
 
 
-        if "m_issueDate" in data["contract"] and data["contract"]["m_issueDate"] != '':
-            if len(data["contract"]["m_issueDate"]) == 8:
-                issueDate = datetime.datetime.strptime(data["contract"]["m_issueDate"], '%Y%m%d')
-            elif len(data["contract"]["m_maturity"]) == 10:
-                issueDate = datetime.datetime.strptime(data["contract"]["m_issueDate"], '%Y-%m-%d')
-            else:
+        if "m_issueDate" in data["contract"] and data["contract"]["m_issueDate"] is not None and data["contract"]["m_issueDate"] != '':
+            try:
+                if len(data["contract"]["m_issueDate"]) == 8:
+                    issueDate = datetime.datetime.strptime(data["contract"]["m_issueDate"], '%Y%m%d')
+                elif len(data["contract"]["m_maturity"]) == 10:
+                    issueDate = datetime.datetime.strptime(data["contract"]["m_issueDate"], '%Y-%m-%d')
+                else:
+                    issueDate = None
+            except:
                 issueDate = None
         else:
             issueDate = None
 
 
-        if "m_underlyingCategory" in data["contract"] and data["contract"]["m_underlyingCategory"] != '':
+        if "m_underlyingCategory" in data["contract"] and data["contract"]["m_underlyingCategory"] is not None and data["contract"]["m_underlyingCategory"] != '':
             underlyingCategory = data["contract"]["m_underlyingCategory"]
         else:
             underlyingCategory = None
 
 
-        if "m_subCategory" in data["contract"] and data["contract"]["m_subCategory"] != '':
+        if "m_subCategory" in data["contract"] and data["contract"]["m_subCategory"] is not None and data["contract"]["m_subCategory"] != '':
             subCategory = data["contract"]["m_subCategory"]
         else:
             subCategory = None
 
 
-        if "m_currency" in data["contract"] and data["contract"]["m_currency"] != '':
+        if "m_currency" in data["contract"] and data["contract"]["m_currency"] is not None and data["contract"]["m_currency"] != '':
             currency = data["contract"]["m_currency"]
         else:
             currency = None
-
 
         ibcontract = Ibcontract(
             assetCategory  = assetCategory,
@@ -174,12 +188,12 @@ def ibexecutionrestfuls_insert_one(data):
             currency = currency
         )
 
-
-
-
-        db.session.add(ibcontract)
-        db.session.commit()
-        current_app.logger.info(f'controller: ibexecutionrestfuls, new contract: {data["contract"]["m_conId"]}')
+        try:
+            db.session.add(ibcontract)
+            db.session.commit()
+            current_app.logger.info(f'controller: ibexecutionrestfuls, new contract: {data["contract"]["m_conId"]}')
+        except:
+            current_app.logger.error(f'ISSUE controller: ibexecutionrestfuls, unable to add contract: {data["contract"]["m_conId"]}')
 
 
     # insert executions
@@ -188,6 +202,25 @@ def ibexecutionrestfuls_insert_one(data):
     if ibexecutionrestful != None:
         current_app.logger.info(f'ibexecutionrestful {data["execution"]["m_execId"]} already existing in db')
     else:
+
+        # clean variables because it went not necessarily through new ibcontract
+        
+        try:
+            multiplier =  float(data["contract"]["m_multiplier"])
+        except:
+            multiplier =  1
+
+        try:
+            strike =  float(data["contract"]["m_strike"])
+        except:
+            strike = None
+
+        try:
+            expiry = datetime.datetime.strptime(data["contract"]["m_expiry"], '%Y%m%d')
+        except:
+            expiry = None
+
+
 
         shares = abs(data["execution"]["m_shares"])
         cumQty = abs(data["execution"]["m_cumQty"])
@@ -227,9 +260,12 @@ def ibexecutionrestfuls_insert_one(data):
 
         )
 
-        db.session.add(ibexecutionrestful)
-        db.session.commit()
-        current_app.logger.info(f'new ibexecutionrestful: {data["execution"]["m_execId"]}')
+        try:
+            db.session.add(ibexecutionrestful)
+            db.session.commit()
+            current_app.logger.info(f'new ibexecutionrestful: {data["execution"]["m_execId"]}')
+        except:
+            current_app.logger.error(f'ISSUE controller: ibexecutionrestfuls, unable to add exec: {data["execution"]["m_execId"]}')
 
     return jsonify( {
             'status': 'ok',
