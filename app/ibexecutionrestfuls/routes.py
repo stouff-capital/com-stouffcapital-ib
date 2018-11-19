@@ -327,7 +327,7 @@ def list_limit_date(date_str):
         one_exec['execution_m_shares'] = ibexecutionrestful.execution_m_shares  # execQty
         one_exec['execution_m_cumQty'] = ibexecutionrestful.execution_m_cumQty
         one_exec['execution_m_price'] = float(ibexecutionrestful.execution_m_price)
-        one_exec['execution_m_avgPrice'] = float(ibexecutionrestful.execution_m_avgPrice)
+        one_exec['execution_m_avgPrice'] = float(ibexecutionrestful.execution_m_avgPrice) if ibexecutionrestful.execution_m_avgPrice != None else None
         one_exec['execution_m_permId'] = ibexecutionrestful.execution_m_permId
 
         one_exec['contract_m_symbol'] = ibexecutionrestful.contract_m_symbol
