@@ -204,7 +204,7 @@ def ibexecutionrestfuls_insert_one(data):
     else:
 
         # clean variables because it went not necessarily through new ibcontract
-        
+
         try:
             multiplier =  float(data["contract"]["m_multiplier"])
         except:
@@ -237,7 +237,7 @@ def ibexecutionrestfuls_insert_one(data):
             execution_m_time = datetime.datetime.strptime( data["execution"]["m_time"], '%Y%m%d  %H:%M:%S'),
             execution_m_permId = int(data["execution"]["m_permId"]),
             execution_m_price = float(data["execution"]["m_price"]),
-            execution_avgPrice = float(data["execution"]["m_avgPrice"]),
+            execution_m_avgPrice = float(data["execution"]["m_avgPrice"]),
             execution_m_cumQty = cumQty,
             execution_m_side = data["execution"]["m_side"],
             execution_m_clientId = int(data["execution"]["m_clientId"]),
@@ -327,7 +327,7 @@ def list_limit_date(date_str):
         one_exec['execution_m_shares'] = ibexecutionrestful.execution_m_shares  # execQty
         one_exec['execution_m_cumQty'] = ibexecutionrestful.execution_m_cumQty
         one_exec['execution_m_price'] = float(ibexecutionrestful.execution_m_price)
-        one_exec['execution_avgPrice'] = float(ibexecutionrestful.execution_avgPrice)
+        one_exec['execution_m_avgPrice'] = float(ibexecutionrestful.execution_m_avgPrice)
         one_exec['execution_m_permId'] = ibexecutionrestful.execution_m_permId
 
         one_exec['contract_m_symbol'] = ibexecutionrestful.contract_m_symbol

@@ -4,6 +4,8 @@ from app import db
 from app.models import Contract, Execution, Bbg
 from app.bridge import bp
 
+from app.ibsymbology import routes as routes_ibsymbology
+
 
 @bp.route('/bridge', methods=['GET'])
 def list():
@@ -140,20 +142,21 @@ def conv_bbgtickers_into_ibsymbols():
     try:
         data = request.get_json()
     except:
-        return jsonify( {'status': 'error', 'error': 'missing data'} )
+        return jsonify( {'status': 'error', 'error': 'missing input data', 'controller': 'bridge'} )
 
     if data == None or 'tickers' not in data:
-        return jsonify( {'status': 'error', 'error': 'missing data'} )
+        return jsonify( {'status': 'error', 'error': 'missing input data', 'controller': 'bridge'} )
 
     output = {'input': [],
-        'output': []}
+        'output': [],
+        'controller': 'ibsymbology'}
 
     bridges = Bbg.query.all()
     for ticker in data['tickers']:
         output['input'].append(ticker)
 
+        '''
         bridge = bbgticker_to_ibsymbol(ticker, bridges)
-
         if bridge == None:
             output['output'].append( {'status': 'error', 'error': 'not able to translate, ask user', 'ticker': ticker, 'input': ticker} )
         else:
@@ -161,5 +164,17 @@ def conv_bbgtickers_into_ibsymbols():
             output['output'].append({'status': 'ok', 'input': ticker.upper(),
                 'localSymbol': contract.localSymbol,
                 'bbgIdentifier': bridge.bbgIdentifier, 'bbgUnderylingId': bridge.bbgUnderylingId, 'internalUnderlying': bridge.internalUnderlying})
+        '''
+
+        # to keep old API with new symbology
+        bridge = routes_ibsymbology.bbgticker_to_ibsymbol(ticker)
+        if bridge == None:
+            output['output'].append( {'status': 'error', 'error': 'not able to translate, ask user', 'ticker': ticker, 'input': ticker} )
+        else:
+            output['output'].append({'status': 'ok', 'input': ticker.upper(),
+                'localSymbol': bridge.ibcontract.symbol,
+                'bbgIdentifier': bridge.bbgIdentifier, 'bbgUnderylingId': bridge.bbgUnderylingId, 'internalUnderlying': bridge.internalUnderlying})
+
+
 
     return jsonify( output )

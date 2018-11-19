@@ -84,3 +84,102 @@ def create():
     else:
         current_app.logger.info(f'ibsymbology:: {data["conid"]} not in Ibcontract')
         return jsonify( {'status': 'error', 'error': 'missing ibcontract', 'inputData': data, 'controller': 'ibsymbology'} )
+
+
+
+def patch_ticker_marketplace(ticker):
+    ticker = ticker.upper()
+    mps = {
+        "GY": "GR",
+        "JT": "JP",
+        "UN": "US",
+        "UQ": "US",
+        "UW": "US",
+        "UR": "US",
+        "SQ": "SM",
+        "SE": "SW"
+    }
+
+    for mp in mps:
+        ticker = ticker.replace(f' {mp} ', f' {mps[mp]} ')
+
+    return ticker
+
+
+def bbgticker_to_ibsymbol(desired_ticker, fullBridge = None):
+    bridge = Ibsymbology.query.filter_by(ticker=desired_ticker.upper()).first()
+
+    if bridge == None:
+        bridge = Ibsymbology.query.filter_by(ticker=patch_ticker_marketplace(desired_ticker).upper()).first()
+
+        if bridge == None and fullBridge != None:
+            for entry in fullBridge:
+                if patch_ticker_marketplace(entry.ticker) == patch_ticker_marketplace(desired_ticker):
+                    bridge = entry
+                    break
+
+    return bridge
+
+@bp.route('/ibsymbology/bbgs/ibs', methods=['POST'])
+def conv_bbgtickers_into_ibsymbols():
+    try:
+        data = request.get_json()
+    except:
+        return jsonify( {'status': 'error', 'error': 'missing input data', 'controller': 'ibsymbology'} )
+
+    if data == None or 'tickers' not in data:
+        return jsonify( {'status': 'error', 'error': 'missing input data', 'controller': 'ibsymbology'} )
+
+    output = {'input': [],
+        'output': [],
+        'controller': 'ibsymbology'}
+
+    bridges = Ibsymbology.query.all()
+    for ticker in data['tickers']:
+        output['input'].append(ticker)
+
+        bridge = bbgticker_to_ibsymbol(ticker, bridges)
+
+        if bridge == None:
+            output['output'].append( {'status': 'error', 'error': 'not able to translate, ask user', 'ticker': ticker, 'input': ticker} )
+        else:
+            output['output'].append({'status': 'ok', 'input': ticker.upper(),
+                'localSymbol': bridge.ibcontract.symbol,
+                'bbgIdentifier': bridge.bbgIdentifier, 'bbgUnderylingId': bridge.bbgUnderylingId, 'internalUnderlying': bridge.internalUnderlying})
+
+    return jsonify( output )
+
+
+@bp.route('/ibsymbology/recent/<date_str>', methods=['GET'])
+def new_manual_mapping(date_str):
+    ibsymbologys = Ibsymbology.query.filter(Ibsymbology.created >= date_str).all()
+
+    output = {
+        'date_limit': date_str,
+        'contracts': []
+    }
+
+    for ibsymbology in ibsymbologys:
+        output['contracts'].append({
+            'ticker': ibsymbology.ticker,
+            'bbgIdentifier': ibsymbology.bbgIdentifier,
+            'bbgUnderylingId': ibsymbology.bbgUnderylingId,
+            'internalUnderlying': ibsymbology.internalUnderlying,
+            'ibcontract_condid': int(ibsymbology.ibcontract_conid),
+            'ibcontract': {
+                'assetCategory': ibsymbology.ibcontract.assetCategory,
+                'symbol': ibsymbology.ibcontract.symbol,
+                'description': ibsymbology.ibcontract.description,
+                'conid': int(ibsymbology.ibcontract.conid),
+                'underlyingConid': ibsymbology.ibcontract.underlyingConid,
+                'underlyingSymbol': ibsymbology.ibcontract.underlyingSymbol,
+                'multiplier': int(ibsymbology.ibcontract.multiplier),
+                'strike': float(ibsymbology.ibcontract.strike) if ibsymbology.ibcontract.strike != None else None,
+                'expiry': ibsymbology.ibcontract.expiry,
+                'putCall': ibsymbology.ibcontract.putCall,
+                'maturity': ibsymbology.ibcontract.maturity,
+                'currency': ibsymbology.ibcontract.currency
+            }
+        })
+
+    return jsonify( output )

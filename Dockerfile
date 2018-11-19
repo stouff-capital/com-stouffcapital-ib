@@ -1,6 +1,5 @@
-
 FROM python:3
-MAINTAINER Greg Chevalley "gregory.chevalley+docker@gmail.com"
+LABEL maintainer="gregory.chevalley+docker@gmail.com"
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt

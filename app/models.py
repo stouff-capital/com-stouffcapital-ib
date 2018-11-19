@@ -44,7 +44,7 @@ class Ibexecutionrestful(db.Model):
     execution_m_time = db.Column(db.DateTime)
     execution_m_permId = db.Column(db.BigInteger, nullable=True)
     execution_m_price = db.Column(db.Numeric(15, 6))
-    execution_avgPrice = db.Column(db.Numeric(15, 6), nullable=True)
+    execution_m_avgPrice = db.Column(db.Numeric(15, 6), nullable=True)
     execution_m_cumQty = db.Column(db.BigInteger, nullable=True)
     execution_m_side = db.Column(db.String(15))
     execution_m_clientId = db.Column(db.Integer, nullable=True)
@@ -75,6 +75,10 @@ class Ibsymbology(db.Model):
     bbgIdentifier = db.Column(db.String(50), nullable=True)
     bbgUnderylingId = db.Column(db.String(50), nullable=True)
     internalUnderlying = db.Column(db.String(50), nullable=True)
+    #created = db.Column(db.DateTime, default=datetime.utcnow)
+    created = db.Column(db.DateTime, server_default=db.func.now())
+    updated = db.Column(db.DateTime, server_default=db.func.now(), server_onupdate=db.func.now())
+
 
     ibcontract_conid = db.Column(db.BigInteger, db.ForeignKey('ibcontract.conid'), primary_key=True)
     ibcontract = db.relationship("Ibcontract", back_populates="bloom")
