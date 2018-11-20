@@ -10,4 +10,4 @@ while true; do
 done
 
 #exec python com-stouffcapital-ib.py
-exec gunicorn -b :5000 --access-logfile - --error-logfile - com-stouffcapital-ib:app
+exec gunicorn -b :5000 --access-logfile - --error-logfile - --timeout 60 com-stouffcapital-ib:app

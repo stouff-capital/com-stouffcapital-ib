@@ -792,7 +792,7 @@ def ib_report_eod_v2():
     df_openPositions = pd.DataFrame(list_openPositions)
 
 
-    df_bridge = pd.read_sql(sql="SELECT * FROM ibsymbology", con=db.engine)
+    df_bridge = pd.read_sql(sql="SELECT ticker, bbgIdentifier, bbgUnderylingId, internalUnderlying, ibcontract_conid FROM ibsymbology", con=db.engine)
 
     df_bridge.rename(columns={'ticker': 'bbg_ticker',
                       'bbgIdentifier': 'Identifier',
