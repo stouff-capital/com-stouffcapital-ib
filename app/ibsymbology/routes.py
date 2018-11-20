@@ -173,7 +173,7 @@ def new_manual_mapping(date_str):
                 'conid': int(ibsymbology.ibcontract.conid),
                 'underlyingConid': ibsymbology.ibcontract.underlyingConid,
                 'underlyingSymbol': ibsymbology.ibcontract.underlyingSymbol,
-                'multiplier': int(ibsymbology.ibcontract.multiplier),
+                'multiplier': int(ibsymbology.ibcontract.multiplier) if ibsymbology.ibcontract.multiplier != None else None,
                 'strike': float(ibsymbology.ibcontract.strike) if ibsymbology.ibcontract.strike != None else None,
                 'expiry': ibsymbology.ibcontract.expiry,
                 'putCall': ibsymbology.ibcontract.putCall,
