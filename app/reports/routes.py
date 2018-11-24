@@ -645,6 +645,7 @@ def ib_upload_eod_report_v2():
 
                 #print(api_Ibcontract)
                 #routes_ibcontract.ibcontract_create_one(api_Ibcontract)
+            current_app.logger.info(f'ib_upload_eod_report_v2:: check ibcontracts OpenPositions')
             routes_ibcontract.ibcontracts_insert_many(list_ibcontractsToCheck)
 
 
@@ -663,17 +664,21 @@ def ib_upload_eod_report_v2():
                 mtd_pnl.append(dict_positions[position])
             df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
 
+            current_app.logger.info(f'ib_upload_eod_report_v2:: check ibcontracts MTDYTDPerformanceSummary')
             routes_ibcontract.ibcontracts_insert_many(mtd_pnl)
 
 
 
-        # clean former execs
-        current_app.logger.info(f'ib_upload_eod_report_v2:: clean former executions pool before {reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}')
-        db.session.query(Ibexecutionrestful).filter(Ibexecutionrestful.execution_m_time <= f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}' ).delete()
-        db.session.commit()
+            # clean former execs
+            current_app.logger.info(f'ib_upload_eod_report_v2:: clean former executions pool before {reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}')
+            db.session.query(Ibexecutionrestful).filter(Ibexecutionrestful.execution_m_time <= f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}' ).delete()
+            db.session.commit()
 
 
-        return jsonify( {'status': 'ok', 'message': 'ib:: successfully retrive flex query start of the day', 'reportDate': f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}', 'controller': 'reports'} )
+            return jsonify( {'status': 'ok', 'message': 'ib:: successfully retrive flex query start of the day', 'reportDate': f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}', 'controller': 'reports'} )
+        else:
+            return jsonify( {'status': 'error', 'error': 'flex query report is invalid', 'controller': 'reports'} )
+
     else:
         print(doc)
         return jsonify( {'status': 'error', 'error': 'unable to retrieve flex query', 'controller': 'reports'} )

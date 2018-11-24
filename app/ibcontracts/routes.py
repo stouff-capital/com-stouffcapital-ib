@@ -31,7 +31,8 @@ def ibcontract_create_one(data):
     except:
         return jsonify( {'status': 'error', 'error': 'missing conid', 'controller': 'ibcontracts'} )
     if ibcontract != None:
-        current_app.logger.info('existing ibcontract')
+        #current_app.logger.info('existing ibcontract')
+        pass
     else:
         ibcontract = Ibcontract(
                     conid=data['conid']

@@ -20,7 +20,8 @@ def ibexecutionrestfuls_insert_one(data):
     ibcontract = Ibcontract.query.get(data["contract"]["m_conId"])
 
     if ibcontract != None:
-        current_app.logger.info(f'controller: ibexecutionrestfuls, existing contract: {data["contract"]["m_conId"]}')
+        #current_app.logger.info(f'controller: ibexecutionrestfuls, existing contract: {data["contract"]["m_conId"]}')
+        pass
     else:
         current_app.logger.info(f'controller: ibexecutionrestfuls, missing contract: {data["contract"]["m_conId"]} will be added now')
 

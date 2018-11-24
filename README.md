@@ -62,4 +62,10 @@ End Function
 ```
 
 ## kubernetes deployment
-`kubectl create secret generic ib --from-literal=mysql-password=<pass> --from-literal=backend-user=<user> --from-literal=backend-password=<pass> --from-literal=sentry-sdk=<sentry_sdk>`
+1. `kubectl create namespace ib`
+1. `kubectl -n ib create secret generic ib --from-literal=mysql-password=<pass> --from-literal=backend-user=<user> --from-literal=backend-password=<pass> --from-literal=sentry-sdk=<sentry_sdk>`
+1. `kubectl create -f deploy/kubernetes/ib-db-pvc.yaml`
+1. `kubectl create -f deploy/kubernetes/ib-backend-pvc.yaml`
+1. `kubectl create -f deploy/kubernetes/ib-mysql.yaml`
+1. `kubectl create -f deploy/kubernetes/ib-backend.yaml`
+1. `kubectl create -f deploy/kubernetes/com-stouffcapital-ib-ing-ssl.yaml`
