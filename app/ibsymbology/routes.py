@@ -152,34 +152,47 @@ def conv_bbgtickers_into_ibsymbols():
 
 @bp.route('/ibsymbology/recent/<date_str>', methods=['GET'])
 def new_manual_mapping(date_str):
-    ibsymbologys = Ibsymbology.query.filter(Ibsymbology.created >= date_str).all()
 
-    output = {
+    return jsonify( {
         'date_limit': date_str,
-        'contracts': []
-    }
-
-    for ibsymbology in ibsymbologys:
-        output['contracts'].append({
-            'ticker': ibsymbology.ticker,
-            'bbgIdentifier': ibsymbology.bbgIdentifier,
-            'bbgUnderylingId': ibsymbology.bbgUnderylingId,
-            'internalUnderlying': ibsymbology.internalUnderlying,
-            'ibcontract_condid': int(ibsymbology.ibcontract_conid),
-            'ibcontract': {
-                'assetCategory': ibsymbology.ibcontract.assetCategory,
-                'symbol': ibsymbology.ibcontract.symbol,
-                'description': ibsymbology.ibcontract.description,
-                'conid': int(ibsymbology.ibcontract.conid),
-                'underlyingConid': ibsymbology.ibcontract.underlyingConid,
-                'underlyingSymbol': ibsymbology.ibcontract.underlyingSymbol,
-                'multiplier': int(ibsymbology.ibcontract.multiplier) if ibsymbology.ibcontract.multiplier != None else None,
-                'strike': float(ibsymbology.ibcontract.strike) if ibsymbology.ibcontract.strike != None else None,
-                'expiry': ibsymbology.ibcontract.expiry,
-                'putCall': ibsymbology.ibcontract.putCall,
-                'maturity': ibsymbology.ibcontract.maturity,
-                'currency': ibsymbology.ibcontract.currency
+        'contracts': [
+            {
+                'ticker': ibsymbology.ticker,
+                'bbgIdentifier': ibsymbology.bbgIdentifier,
+                'bbgUnderylingId': ibsymbology.bbgUnderylingId,
+                'internalUnderlying': ibsymbology.internalUnderlying,
+                'ibcontract_condid': int(ibsymbology.ibcontract_conid),
+                'ibcontract': {
+                    'assetCategory': ibsymbology.ibcontract.assetCategory,
+                    'symbol': ibsymbology.ibcontract.symbol,
+                    'description': ibsymbology.ibcontract.description,
+                    'conid': int(ibsymbology.ibcontract.conid),
+                    'underlyingConid': ibsymbology.ibcontract.underlyingConid,
+                    'underlyingSymbol': ibsymbology.ibcontract.underlyingSymbol,
+                    'multiplier': int(ibsymbology.ibcontract.multiplier) if ibsymbology.ibcontract.multiplier != None else None,
+                    'strike': float(ibsymbology.ibcontract.strike) if ibsymbology.ibcontract.strike != None else None,
+                    'expiry': ibsymbology.ibcontract.expiry,
+                    'putCall': ibsymbology.ibcontract.putCall,
+                    'maturity': ibsymbology.ibcontract.maturity,
+                    'currency': ibsymbology.ibcontract.currency
+                }
             }
-        })
+            for ibsymbology in Ibsymbology.query.filter(Ibsymbology.created >= date_str).all()
+        ]
+    } )
 
-    return jsonify( output )
+
+@bp.route('/ibsymbology/remove/<int:conid>', methods=['GET'])
+def remove_mapping(conid):
+    try:
+        ibsymbology = Ibsymbology.query.get(conid)
+    except:
+        return jsonify( {'status': 'error', 'error': 'missing conid', 'inputData': conid, 'controller': 'ibsymbology'} )
+    if ibsymbology != None:
+        db.session.delete(ibsymbology)
+        db.session.commit()
+        current_app.logger.info(f'delete ibsymbology:: conid: {conid}')
+
+        return jsonify({'status': 'ok', 'input': conid, 'controller': 'ibsymbology'})
+    else:
+        return jsonify( {'status': 'error', 'error': 'missing entry in database', 'inputData': conid, 'controller': 'ibsymbology'} )
