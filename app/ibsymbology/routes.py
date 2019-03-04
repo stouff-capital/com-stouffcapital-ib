@@ -161,7 +161,7 @@ def new_manual_mapping(date_str):
                 'bbgIdentifier': ibsymbology.bbgIdentifier,
                 'bbgUnderylingId': ibsymbology.bbgUnderylingId,
                 'internalUnderlying': ibsymbology.internalUnderlying,
-                'ibcontract_condid': int(ibsymbology.ibcontract_conid),
+                'ibcontract_conid': int(ibsymbology.ibcontract_conid),
                 'ibcontract': {
                     'assetCategory': ibsymbology.ibcontract.assetCategory,
                     'symbol': ibsymbology.ibcontract.symbol,
@@ -180,6 +180,62 @@ def new_manual_mapping(date_str):
             for ibsymbology in Ibsymbology.query.filter(Ibsymbology.created >= date_str).all()
         ]
     } )
+
+
+@bp.route('/ibsymbology/recent/<date_str>/checks', methods=['GET'])
+def new_manual_mapping_opportunistic_checks(date_str):
+    new_contracts = [
+        {
+            'ticker': ibsymbology.ticker,
+            'bbgIdentifier': ibsymbology.bbgIdentifier,
+            'bbgUnderylingId': ibsymbology.bbgUnderylingId,
+            'internalUnderlying': ibsymbology.internalUnderlying,
+            'ibcontract_conid': int(ibsymbology.ibcontract_conid),
+            'ibcontract': {
+                'assetCategory': ibsymbology.ibcontract.assetCategory,
+                'symbol': ibsymbology.ibcontract.symbol,
+                'description': ibsymbology.ibcontract.description,
+                'conid': int(ibsymbology.ibcontract.conid),
+                'underlyingConid': ibsymbology.ibcontract.underlyingConid,
+                'underlyingSymbol': ibsymbology.ibcontract.underlyingSymbol,
+                'multiplier': int(ibsymbology.ibcontract.multiplier) if ibsymbology.ibcontract.multiplier != None else None,
+                'strike': float(ibsymbology.ibcontract.strike) if ibsymbology.ibcontract.strike != None else None,
+                'expiry': ibsymbology.ibcontract.expiry,
+                'putCall': ibsymbology.ibcontract.putCall,
+                'maturity': ibsymbology.ibcontract.maturity,
+                'currency': ibsymbology.ibcontract.currency
+            }
+        }
+        for ibsymbology in Ibsymbology.query.filter(Ibsymbology.created >= date_str).all()
+        ]
+
+    data = []
+    for newAsset in new_contracts:
+        for subkey_ibcontract in newAsset['ibcontract']:
+            newAsset["ibcontract_" + subkey_ibcontract] = newAsset['ibcontract'][subkey_ibcontract]
+
+        del newAsset['ibcontract']
+        data.append(newAsset)
+
+    df = pd.DataFrame(data)
+
+    df.ibcontract_expiry = pd.to_datetime( df.ibcontract_expiry, format="%a, %d %b %Y %H:%M:%S %Z" )
+    df['ibExpiryPart'] = df.ibcontract_expiry.dt.strftime("%m/%d/%y")
+    df['bbgTicker_expiry'] = df.ticker.str.extract(r'([\d]{2}/[\d]{2}/[\d]{2})')
+
+    df['bbgTicker_putCall'] = df.ticker.str.extract(r'\s([PpCp])[\d]+')
+
+    df_options = df[df.ibcontract_assetCategory == 'OPT']
+
+
+    return jsonify( {
+        'new_assets': [],
+        'option_issues': {
+            'expiryDate': [],
+            'putCall': []
+        }
+        } )
+
 
 
 @bp.route('/ibsymbology/remove/<int:conid>', methods=['GET'])

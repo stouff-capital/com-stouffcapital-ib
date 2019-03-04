@@ -725,7 +725,22 @@ def ib_report_eod_v2():
 
             if openPosition['conid'] == ibexecutionrestful['contract_m_conId']:
                 openPosition['position_current'] += ibexecutionrestful['execution_m_shares']
+
+                openPosition['position_d_chg'] = openPosition['position_current'] - openPosition['position_eod']
+
                 openPosition['ntcf_d_local'] -= ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier']
+
+                openPosition['costBasisMoney_d_long'] += ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] > 0 else 0
+
+                openPosition['costBasisMoney_d_short'] += ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] < 0 else 0
+
+                if openPosition['position_d_chg'] == 0:
+                    openPosition['costBasisPrice_d'] = 0
+                elif openPosition['position_d_chg'] > 0:
+                    openPosition['costBasisPrice_d'] = ( openPosition['costBasisMoney_d_long'] + openPosition['costBasisMoney_d_short'] ) / openPosition['position_d_chg']
+                elif openPosition['position_d_chg'] < 0:
+                    openPosition['costBasisPrice_d'] = ( openPosition['costBasisMoney_d_short'] + openPosition['costBasisMoney_d_long'] ) / openPosition['position_d_chg']
+
 
                 found_in_daily_statement = True
                 break
@@ -747,6 +762,11 @@ def ib_report_eod_v2():
                 'ntcf_d_local': -1 * ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
                 'Symbole': f'{ibexecutionrestful["contract_m_symbol"]}/{ibexecutionrestful["contract_m_localSymbol"]}',
                 'conid': ibexecutionrestful['contract_m_conId'],
+                'costBasisMoney_d_long': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] > 0 else 0,
+                'costBasisMoney_d_short': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] < 0 else 0,
+                'costBasisPrice_eod': 0,
+                'fifoPnlUnrealized_eod': 0,
+                'costBasisPrice_d': ibexecutionrestful['execution_m_price'] / abs(ibexecutionrestful['execution_m_shares'])
             })
 
 
@@ -948,7 +968,7 @@ def ib_fq_dailyStatement_OpenPositions(doc):
         else:
             list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
 
-        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV']
+        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV', 'costBasisMoney', 'costBasisPrice', 'fifoPnlUnrealized']
         intfields_OpenPosition = ['conid', 'multiplier', 'position']
         datefields_OpenPosition = ['reportDate']
 
@@ -989,10 +1009,16 @@ def ib_fq_dailyStatement_OpenPositions(doc):
                     'pnl_y_local': 0,
                     'pnl_y_eod_local': 0,
                     'position_eod': api_OpenPosition['position'],
+                    'position_d_chg': 0,
                     'price_eod': api_OpenPosition['markPrice'],
                     'ntcf_d_local': 0,
                     'Symbole': api_OpenPosition['symbol'],
                     'conid': api_OpenPosition['conid'],
+                    'costBasisMoney_d_long': 0,
+                    'costBasisMoney_d_short': 0,
+                    'costBasisPrice_eod': api_OpenPosition['costBasisPrice'],
+                    'fifoPnlUnrealized_eod': api_OpenPosition['fifoPnlUnrealized'],
+                    'costBasisPrice_d': 0,
                 })
 
                 distinct_positions[ api_OpenPosition['conid'] ] = 1
