@@ -23,11 +23,13 @@ def ibcontract_exists(conid):
 def ibcontract_create_one(data):
     # query if ibcontract already exists
     try:
-        current_app.logger.info(f'check ibcontract: {data["conid"]}')
+        #current_app.logger.info(f'check ibcontract: {data["conid"]}')
 
         data['conid'] = int(data['conid'])
 
         ibcontract = Ibcontract.query.get(data['conid'])
+
+        return jsonify( {'status': 'ok', 'message': f'ibcontract {data["conid"]} nothing to do', 'controller': 'ibcontracts'} )
     except:
         return jsonify( {'status': 'error', 'error': 'missing conid', 'controller': 'ibcontracts'} )
     if ibcontract != None:
@@ -81,7 +83,7 @@ def ibcontract_create_one(data):
         db.session.commit()
         current_app.logger.info(f'new ibcontract: {data["conid"]}')
 
-    return jsonify( {'status': 'ok', 'message': f'ibcontract {data["conid"]} successfully created', 'controller': 'ibcontracts'} )
+        return jsonify( {'status': 'ok', 'message': f'ibcontract {data["conid"]} successfully created', 'controller': 'ibcontracts'} )
 
 
 @bp.route('/ibcontracts', methods=['POST'])
