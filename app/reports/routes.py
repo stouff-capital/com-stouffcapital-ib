@@ -646,7 +646,7 @@ def ib_upload_eod_report_v2():
                 #print(api_Ibcontract)
                 #routes_ibcontract.ibcontract_create_one(api_Ibcontract)
             current_app.logger.info(f'ib_upload_eod_report_v2:: check ibcontracts OpenPositions')
-            routes_ibcontract.ibcontracts_insert_many(list_ibcontractsToCheck)
+            current_app.logger.info( f'ib_upload_eod_report_v2:: new assets from OpenPositions: {json.loads(routes_ibcontract.ibcontracts_insert_many(list_ibcontractsToCheck).data)["newAssets_count"]}' )
 
 
             # create ibcontract from monthly perf
@@ -665,7 +665,7 @@ def ib_upload_eod_report_v2():
             df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
 
             current_app.logger.info(f'ib_upload_eod_report_v2:: check ibcontracts MTDYTDPerformanceSummary')
-            routes_ibcontract.ibcontracts_insert_many(mtd_pnl)
+            current_app.logger.info( f'ib_upload_eod_report_v2:: new asset from MTDYTDPerformanceSummary: {json.loads(routes_ibcontract.ibcontracts_insert_many(mtd_pnl).data)["newAssets_count"]}' )
 
 
 
