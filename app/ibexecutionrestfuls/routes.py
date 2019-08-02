@@ -292,10 +292,17 @@ def create_one():
 
 
 def ibexecutionrestfuls_insert_many(data):
-    for ibexecutionrestful in data:
-        ibexecutionrestfuls_insert_one(ibexecutionrestful)
 
-    return jsonify( {'status': 'ok', 'message': 'bulk', 'executions': len(data), 'controller': 'ibexecutionrestfuls'} )
+    ibexecutionrestfuls = [exec[0] for exec in Ibexecutionrestful.query.with_entities(Ibexecutionrestful.execution_m_execId).all() ]
+
+    newExec_count = 0
+    for ibexecutionrestful in data:
+        if ibexecutionrestful["execution"]["m_execId"] not in ibexecutionrestfuls:
+            ibexecutionrestfuls_insert_one(ibexecutionrestful)
+            newExec_count += 1
+
+
+    return jsonify( {'status': 'ok', 'message': 'bulk', 'executions': len(data), 'controller': 'ibexecutionrestfuls', 'newExecs_count': newExec_count} )
 
 
 @bp.route('/ibexecutionrestfuls/bulk', methods=['POST'])
