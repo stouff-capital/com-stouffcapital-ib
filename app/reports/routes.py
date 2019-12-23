@@ -837,7 +837,7 @@ def ib_report_eod_v2():
 
 @bp.route('/reports/ib/eod/v2/xls', methods=['POST'])
 def ib_report_eod_v2_xls():
-    current_app.logger.info('in /reports/ib/eod/v2/xl')
+    current_app.logger.info('in /reports/ib/eod/v2/xls')
     with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
         doc = xmltodict.parse(fd.read())
     current_app.logger.info('after opening full report fq')
@@ -848,15 +848,20 @@ def ib_report_eod_v2_xls():
     # inject intraday executions
     list_openPositions = df_openPositions.to_dict(orient='record')
     new_openPos = []
+    current_app.logger.info('before reading post content')
     input_data = request.get_json()
+    print(input_data)
+    current_app.logger.info('after reading post content')
 
     if input_data != None and 'execDetails' in input_data:
         current_app.logger.info('post execs')
         # push dans le pool in 1 call
         routes_ibexecutionrestfuls.ibexecutionrestfuls_insert_many(input_data['execDetails'])
+        current_app.logger.info('after reading post content')
 
-
+    current_app.logger.info('before call ib_upload_eod_report_date_v2()')
     date_obj = json.loads( ib_upload_eod_report_date_v2().get_data() )
+    current_app.logger.info('after call ib_upload_eod_report_date_v2()')
     dt_report = datetime.strptime( date_obj['reportDate'], '%Y-%m-%d')
     dt_refExec = dt_report + timedelta(days=1)
 
