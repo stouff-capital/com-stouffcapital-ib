@@ -1059,14 +1059,14 @@ def ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc):
                     for dict_key in MTDYTDPerformanceSummaryUnderlying:
                         dict_data[dict_key[1:]] = MTDYTDPerformanceSummaryUnderlying[dict_key]
 
-                    int_fields = ['conid', 'multiplier']
+                    int_fields = ['conid']
                     for field in int_fields:
                         try:
                             dict_data[field] = int(dict_data[field])
                         except:
                             dict_data[field] = None
 
-                    float_fields = ['mtmMTD']
+                    float_fields = ['mtmMTD', 'multiplier']
                     for field in float_fields:
                         try:
                             dict_data[field] = float(dict_data[field])
@@ -1125,8 +1125,8 @@ def ib_fq_dailyStatement_OpenPositions(doc):
         else:
             list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
 
-        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV', 'costBasisMoney', 'costBasisPrice', 'fifoPnlUnrealized']
-        intfields_OpenPosition = ['conid', 'multiplier', 'position']
+        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV', 'costBasisMoney', 'costBasisPrice', 'fifoPnlUnrealized', 'multiplier']
+        intfields_OpenPosition = ['conid', 'position']
         datefields_OpenPosition = ['reportDate']
 
 
