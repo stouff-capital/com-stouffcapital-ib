@@ -684,6 +684,7 @@ def ib_upload_eod_report_v2():
         return jsonify( {'status': 'error', 'error': 'unable to retrieve flex query', 'controller': 'reports'} )
 
 
+'''
 @bp.route('/reports/ib/eod/v2', methods=['GET'])
 def ib_report_eod_v2():
 
@@ -750,8 +751,8 @@ def ib_report_eod_v2():
             #current_app.logger.info(f'found exec which needs a new positions: {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]})')
 
             list_openPositions.append({
-                'provider': 'IB',
-                #'strategy': api_OpenPosition['execution_m_acctNumber'],
+                'provider': 'IB'
+                'provider_account': ibexecutionrestful['execution_m_acctNumber'],
                 'strategy': "MULTI",
                 'position_current': ibexecutionrestful['execution_m_shares'],
                 'pnl_d_local': 0,
@@ -832,7 +833,7 @@ def ib_report_eod_v2():
     df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None)
 
     return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions.to_dict(orient='records') } )
-
+'''
 
 
 @bp.route('/reports/ib/eod/v2/xls', methods=['POST'])
@@ -847,10 +848,9 @@ def ib_report_eod_v2_xls():
 
     # inject intraday executions
     list_openPositions = df_openPositions.to_dict(orient='record')
-    new_openPos = []
     current_app.logger.info('before reading post content')
     input_data = request.get_json()
-    print(input_data)
+    #print(input_data)
     current_app.logger.info('after reading post content')
 
     if input_data != None and 'execDetails' in input_data:
@@ -875,13 +875,17 @@ def ib_report_eod_v2_xls():
 
         ibexecutionrestful = current_executions['executions'][ibexecutionrestful_execution_m_execId]
 
+        if ibexecutionrestful['execution_m_acctNumber'][-1] == 'F':
+            ibexecutionrestful['execution_m_acctNumber'] = ibexecutionrestful['execution_m_acctNumber'][:-1]
+
         #current_app.logger.info(f'found exec {ibexecutionrestful["execution_m_execId"]} for {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]}): {ibexecutionrestful["execution_m_shares"]} @ {ibexecutionrestful["execution_m_price"]}')
 
         found_in_daily_statement = False
 
         for openPosition in list_openPositions:
 
-            if openPosition['conid'] == ibexecutionrestful['contract_m_conId']:
+            # if openPosition['conid'] == ibexecutionrestful['contract_m_conId']:
+            if openPosition['conid'] == ibexecutionrestful['contract_m_conId'] and openPosition['provider_account'] == ibexecutionrestful['execution_m_acctNumber']: # same asset & same account
                 openPosition['position_current'] += ibexecutionrestful['execution_m_shares']
 
                 openPosition['position_d_chg'] = openPosition['position_current'] - openPosition['position_eod']
@@ -908,7 +912,8 @@ def ib_report_eod_v2_xls():
             #current_app.logger.info(f'found exec which needs a new positions: {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]})')
 
             list_openPositions.append({
-                'provider': 'IB',
+                'provider': 'IB', 
+                'provider_account': ibexecutionrestful['execution_m_acctNumber'],
                 #'strategy': api_OpenPosition['execution_m_acctNumber'],
                 'strategy': "MULTI",
                 'position_current': ibexecutionrestful['execution_m_shares'],
@@ -951,7 +956,8 @@ def ib_report_eod_v2_xls():
     for monthly_pnl in df_MTDYTDPerformanceSummary.to_dict(orient='record'):
         found_in_daily_statement = False
         for openPosition in list_openPositions:
-            if monthly_pnl['conid'] == openPosition['conid']:
+            # if monthly_pnl['conid'] == openPosition['conid']:
+            if monthly_pnl['conid'] == openPosition['conid'] and monthly_pnl['accountId'] == openPosition['provider_account']:
                 found_in_daily_statement = True
                 openPosition['pnl_m_eod_base'] = monthly_pnl['mtmMTD']
                 break
@@ -959,6 +965,7 @@ def ib_report_eod_v2_xls():
         if found_in_daily_statement == False:
             list_openPositions.append({
                 'provider': 'IB',
+                'provider_account': monthly_pnl['accountId'],
                 'strategy': "MULTI",
                 'position_current': 0,
                 'pnl_d_local': 0,
@@ -1075,8 +1082,20 @@ def ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc):
 
                     dict_data['reportDate'] = reportDate
 
+                    if dict_data['accountId'][-1] == 'F':
+                        dict_data['accountId'] = dict_data['accountId'][:-1]
+                    
 
-                    data.append(dict_data)
+                    found_in_pnl = False
+                    for pnl in data:
+                        if pnl['conid'] == dict_data['conid'] and pnl['accountId'] == dict_data['accountId']:
+                            # merge
+                            pnl['mtmMTD'] += dict_data['mtmMTD']
+                            found_in_pnl = True
+                            break
+                    
+                    if found_in_pnl == False:
+                        data.append(dict_data)
 
     return pd.DataFrame(data)
 
@@ -1145,6 +1164,44 @@ def ib_fq_dailyStatement_OpenPositions(doc):
                     else:
                         api_OpenPosition[key_OpenPosition[1:]] = OpenPosition[key_OpenPosition]
 
+            if api_OpenPosition['accountId'][-1] == 'F':
+                api_OpenPosition['accountId'] = api_OpenPosition['accountId'][:-1]
+
+            already_in_dataset = False
+            for openPosition in data_openPositions:
+                if openPosition['conid'] == api_OpenPosition['conid'] and openPosition['provider_account'] == api_OpenPosition['accountId']:
+                    # merge
+                    openPosition['position_current'] += api_OpenPosition['position']
+                    openPosition['position_eod'] += api_OpenPosition['position']
+
+                    if openPosition['price_eod'] != api_OpenPosition['markPrice']:
+                        current_app.logger.warning(f'ib_fq_dailyStatement_OpenPositions:: merge 2 positions {openPosition["conid"]} with different eod prices.')
+                    already_in_dataset = True
+                    break
+            
+            if already_in_dataset == False:
+                data_openPositions.append({
+                    'provider': 'IB',
+                    'provider_account': api_OpenPosition['accountId'],
+                    'strategy': "MULTI",
+                    'position_current': api_OpenPosition['position'],
+                    'pnl_d_local': 0,
+                    'pnl_y_local': 0,
+                    'pnl_y_eod_local': 0,
+                    'position_eod': api_OpenPosition['position'],
+                    'position_d_chg': 0,
+                    'price_eod': api_OpenPosition['markPrice'],
+                    'ntcf_d_local': 0,
+                    'Symbole': api_OpenPosition['symbol'],
+                    'conid': api_OpenPosition['conid'],
+                    'costBasisMoney_d_long': 0,
+                    'costBasisMoney_d_short': 0,
+                    'costBasisPrice_eod': api_OpenPosition['costBasisPrice'],
+                    'fifoPnlUnrealized_eod': api_OpenPosition['fifoPnlUnrealized'],
+                    'costBasisPrice_d': 0,
+                })
+
+            '''
             if api_OpenPosition['conid'] in distinct_positions:
                 # merge
                 for openPosition in data_openPositions:
@@ -1159,7 +1216,7 @@ def ib_fq_dailyStatement_OpenPositions(doc):
             else:
                 data_openPositions.append({
                     'provider': 'IB',
-                    #'strategy': api_OpenPosition['accountId'],
+                    'provider_account': api_OpenPosition['accountId'],
                     'strategy': "MULTI",
                     'position_current': api_OpenPosition['position'],
                     'pnl_d_local': 0,
@@ -1179,6 +1236,7 @@ def ib_fq_dailyStatement_OpenPositions(doc):
                 })
 
                 distinct_positions[ api_OpenPosition['conid'] ] = 1
+            '''
 
     return pd.DataFrame(data_openPositions)
 
