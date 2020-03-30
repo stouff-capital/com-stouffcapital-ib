@@ -938,6 +938,7 @@ def ib_report_eod_v2_xls():
 
     # inject monthly pnl in base currency - ibcontracts are created with flex query results are retrieved
     df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
+    '''
     dict_positions = {}
     mtd_pnl = []
     for position in df_MTDYTDPerformanceSummary.to_dict(orient='records'):
@@ -950,6 +951,7 @@ def ib_report_eod_v2_xls():
     for position in dict_positions:
         mtd_pnl.append(dict_positions[position])
     df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
+    '''
 
     list_openPositions = df_openPositions.to_dict(orient='record')
 
