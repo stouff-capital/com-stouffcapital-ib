@@ -103,11 +103,15 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+.vscode
 
 app.db
 com-stouffcapital-ib.log*
 
 app/reports/data/*.csv
 app/reports/data/*.xml
+app/reports/data/*.gz
+
+alchemydumps-backup/*.gz
 
 deploy/kubernetes/ib-secret.yaml

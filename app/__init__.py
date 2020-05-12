@@ -5,11 +5,13 @@ from flask import Flask, request, current_app
 from flask_basicauth import BasicAuth
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from flask_alchemydumps import AlchemyDumps
 
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 
 from config import Config
+
 
 sentry_sdk.init(
     dsn=Config.SENTRY_DSN,
@@ -18,6 +20,7 @@ sentry_sdk.init(
 
 basic_auth = BasicAuth()
 db = SQLAlchemy()
+alchemydumps = AlchemyDumps()
 migrate = Migrate()
 
 def create_app(config_class=Config):
@@ -28,6 +31,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
 
+    alchemydumps.init_app(app, db)
 
     from app.contracts import bp as contracts_bp
     app.register_blueprint(contracts_bp)
@@ -56,5 +60,6 @@ def create_app(config_class=Config):
         app.logger.info('com-stouffcapital-ib startup')
 
     return app
+
 
 from app import models

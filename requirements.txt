@@ -1,8 +1,10 @@
 alembic
 dateparser
 Flask
+Flask-AlchemyDumps
 Flask-BasicAuth
 Flask-Migrate
+Flask-Script
 Flask-SQLAlchemy
 gunicorn
 mysql-connector-python

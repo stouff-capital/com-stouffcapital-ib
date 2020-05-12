@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from flask import render_template, flash, json, redirect, url_for, request, Response, g, jsonify, current_app
+from flask import render_template, flash, json, redirect, url_for, request, Response, send_file, g, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
 import csv
@@ -7,14 +7,16 @@ import pandas as pd
 import numpy as np
 import requests
 import xmltodict
-from app import db
+from app import db, alchemydumps
 from app.models import Contract, Bbg, Ibexecutionrestful
 from app.reports import bp
 from app.contracts import routes as routes_contract
 from app.executions import routes as routes_executions
 from app.ibcontracts import routes as routes_ibcontract
 from app.ibexecutionrestfuls import routes as routes_ibexecutionrestfuls
-
+import tarfile
+from flask_alchemydumps.database import AlchemyDumpsDatabase
+from flask_alchemydumps.backup import Backup
 
 SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
 IB_FILE_LAST = 'MULTI_last.csv'
@@ -1055,49 +1057,51 @@ def ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc):
     if len(list_FlexStatements) > 0:
         reportDate = ib_fq_dailyStatement_reportDate(doc)
         for FlexStatement in list_FlexStatements:
+            if 'MTDYTDPerformanceSummary' in FlexStatement:
+                if isinstance( FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying'], list): # more than 1 item
+                    list_MTDYTDPerformanceSummaryUnderlying = FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying']
+                else:
+                    list_MTDYTDPerformanceSummaryUnderlying = [ FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying'] ]
 
-            if isinstance( FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying'], list): # more than 1 item
-                list_MTDYTDPerformanceSummaryUnderlying = FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying']
+                for MTDYTDPerformanceSummaryUnderlying in list_MTDYTDPerformanceSummaryUnderlying:
+
+                    if MTDYTDPerformanceSummaryUnderlying['@description'] != 'Total' and  MTDYTDPerformanceSummaryUnderlying['@conid'] != '' :
+                        dict_data = {}
+                        for dict_key in MTDYTDPerformanceSummaryUnderlying:
+                            dict_data[dict_key[1:]] = MTDYTDPerformanceSummaryUnderlying[dict_key]
+
+                        int_fields = ['conid']
+                        for field in int_fields:
+                            try:
+                                dict_data[field] = int(dict_data[field])
+                            except:
+                                dict_data[field] = None
+
+                        float_fields = ['mtmMTD', 'multiplier']
+                        for field in float_fields:
+                            try:
+                                dict_data[field] = float(dict_data[field])
+                            except:
+                                dict_data[field] = None
+
+                        dict_data['reportDate'] = reportDate
+
+                        if dict_data['accountId'][-1] == 'F':
+                            dict_data['accountId'] = dict_data['accountId'][:-1]
+                        
+
+                        found_in_pnl = False
+                        for pnl in data:
+                            if pnl['conid'] == dict_data['conid'] and pnl['accountId'] == dict_data['accountId']:
+                                # merge
+                                pnl['mtmMTD'] += dict_data['mtmMTD']
+                                found_in_pnl = True
+                                break
+                        
+                        if found_in_pnl == False:
+                            data.append(dict_data)
             else:
-                list_MTDYTDPerformanceSummaryUnderlying = [ FlexStatement['MTDYTDPerformanceSummary']['MTDYTDPerformanceSummaryUnderlying'] ]
-
-            for MTDYTDPerformanceSummaryUnderlying in list_MTDYTDPerformanceSummaryUnderlying:
-
-                if MTDYTDPerformanceSummaryUnderlying['@description'] != 'Total' and  MTDYTDPerformanceSummaryUnderlying['@conid'] != '' :
-                    dict_data = {}
-                    for dict_key in MTDYTDPerformanceSummaryUnderlying:
-                        dict_data[dict_key[1:]] = MTDYTDPerformanceSummaryUnderlying[dict_key]
-
-                    int_fields = ['conid']
-                    for field in int_fields:
-                        try:
-                            dict_data[field] = int(dict_data[field])
-                        except:
-                            dict_data[field] = None
-
-                    float_fields = ['mtmMTD', 'multiplier']
-                    for field in float_fields:
-                        try:
-                            dict_data[field] = float(dict_data[field])
-                        except:
-                            dict_data[field] = None
-
-                    dict_data['reportDate'] = reportDate
-
-                    if dict_data['accountId'][-1] == 'F':
-                        dict_data['accountId'] = dict_data['accountId'][:-1]
-                    
-
-                    found_in_pnl = False
-                    for pnl in data:
-                        if pnl['conid'] == dict_data['conid'] and pnl['accountId'] == dict_data['accountId']:
-                            # merge
-                            pnl['mtmMTD'] += dict_data['mtmMTD']
-                            found_in_pnl = True
-                            break
-                    
-                    if found_in_pnl == False:
-                        data.append(dict_data)
+                return pd.DataFrame([])
 
     return pd.DataFrame(data)
 
@@ -1796,3 +1800,35 @@ def ib_eod():
 
 
         return jsonify( df[:][col_to_export].to_dict(orient='records') )
+
+
+@bp.route('/backup/ibkr', methods=['GET'])
+def ib_backup_ibkr():
+    return send_file(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST))
+
+
+@bp.route('/backup/db', methods=['GET'])
+def ib_backup_db():
+    alchemy = AlchemyDumpsDatabase()
+    data = alchemy.get_data()
+    backup = Backup()
+    files = []
+    for class_name in data.keys():
+        name = backup.get_name(class_name)
+        full_path = backup.target.create_file(name, data[class_name])
+        files.append(full_path)
+        rows = len(alchemy.parse_data(data[class_name]))
+        if full_path:
+            current_app.logger.info(f'successfully backup {full_path}')
+            pass
+        else:
+            pass
+    backup.close_ftp()
+
+    if len(files) > 0:
+        with tarfile.open(os.path.join(SCRIPT_ROOT + '/data/', 'backup_db.gz'), 'w:gz') as fp:
+            #fp.add(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST))
+            for p in files:
+                fp.add(p)
+
+        return send_file(os.path.join(SCRIPT_ROOT + '/data/', 'backup_db.gz'))
