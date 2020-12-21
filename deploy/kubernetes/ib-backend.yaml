@@ -13,7 +13,7 @@ spec:
     tier: backend
   clusterIP: None
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ib-backend
@@ -21,6 +21,11 @@ metadata:
   labels:
     app: ib
 spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ib
+      tier: backend
   strategy:
     type: Recreate
   template:

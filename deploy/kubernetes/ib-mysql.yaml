@@ -13,7 +13,7 @@ spec:
     tier: mysql
   clusterIP: None
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ib-mysql
@@ -21,6 +21,11 @@ metadata:
   labels:
     app: ib
 spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ib
+      tier: mysql
   strategy:
     type: Recreate
   template:
@@ -29,6 +34,7 @@ spec:
         app: ib
         tier: mysql
     spec:
+      serviceAccountName: ib-sa
       containers:
       - image: mysql:5.6
         name: ib-mysql

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ib-nginx
+  namespace: ib
+  labels:
+    app: ib
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ib
+      tier: nginx
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: ib
+        tier: nginx
+    spec:
+      serviceAccountName: ib-sa
+      containers:
+      - image: nginx
+        name: ib-nginx
+        ports:
+        - containerPort: 80
+          name: nginx

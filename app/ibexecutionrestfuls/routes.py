@@ -197,6 +197,27 @@ def ibexecutionrestfuls_insert_one(data):
             current_app.logger.error(f'ISSUE controller: ibexecutionrestfuls, unable to add contract: {data["contract"]["m_conId"]}')
 
 
+    if int(data["execution"]["m_execId"].split(".")[-1]) != 1:
+        former_execs = []
+        for i in range(int(data["execution"]["m_execId"].split(".")[-1])-1, 0, -1 ):
+           execId_suffix = '00' + str(i) 
+           execId_suffix = execId_suffix[-2:]
+           former_execs.append( Ibexecutionrestful.query.get( f'{".".join(execId.split(".")[:-1])}.{suffix}'  )
+        
+        for execId in former_execs:
+            if execId != None:
+                return jsonify( {
+                        'status': 'ok', 
+                        'message': 'duplicate, rebooking'
+                        'controller': 'ibexecutionrestfuls',
+                        'inputData': data,
+                        'ibcontract': {'conid': ibcontract.conid},
+                        'order': {'orderId': execId.execution_m_orderId},
+                        'execution': {'execId': execId.execution_m_execId}
+                } )
+
+
+
     # insert executions
     current_app.logger.info(f'check existing execution: {data["execution"]["m_execId"]}')
     ibexecutionrestful = Ibexecutionrestful.query.get(data["execution"]["m_execId"])
