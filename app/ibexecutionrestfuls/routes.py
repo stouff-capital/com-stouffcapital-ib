@@ -202,13 +202,13 @@ def ibexecutionrestfuls_insert_one(data):
         for i in range(int(data["execution"]["m_execId"].split(".")[-1])-1, 0, -1 ):
            execId_suffix = '00' + str(i) 
            execId_suffix = execId_suffix[-2:]
-           former_execs.append( Ibexecutionrestful.query.get( f'{".".join(execId.split(".")[:-1])}.{suffix}'  )
+           former_execs.append( Ibexecutionrestful.query.get( f'{".".join(data["execution"]["m_execId"].split(".")[:-1])}.{execId_suffix}' ) )
         
         for execId in former_execs:
             if execId != None:
                 return jsonify( {
                         'status': 'ok', 
-                        'message': 'duplicate, rebooking'
+                        'message': 'duplicate, rebooking',
                         'controller': 'ibexecutionrestfuls',
                         'inputData': data,
                         'ibcontract': {'conid': ibcontract.conid},
