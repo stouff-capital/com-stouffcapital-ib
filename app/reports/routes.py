@@ -1186,6 +1186,7 @@ def ib_fq_dailyStatement_OpenPositions(doc):
                     break
             
             if already_in_dataset == False:
+                
                 data_openPositions.append({
                     'provider': 'IB',
                     'provider_account': api_OpenPosition['accountId'],
@@ -1202,7 +1203,7 @@ def ib_fq_dailyStatement_OpenPositions(doc):
                     'conid': api_OpenPosition['conid'],
                     'costBasisMoney_d_long': 0,
                     'costBasisMoney_d_short': 0,
-                    'costBasisPrice_eod': api_OpenPosition['costBasisPrice'],
+                    'costBasisPrice_eod': api_OpenPosition['costBasisPrice'] if 'costBasisPrice' in api_OpenPosition else 0,
                     'fifoPnlUnrealized_eod': api_OpenPosition['fifoPnlUnrealized'],
                     'costBasisPrice_d': 0,
                 })

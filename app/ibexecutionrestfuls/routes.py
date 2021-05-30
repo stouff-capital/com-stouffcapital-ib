@@ -206,6 +206,7 @@ def ibexecutionrestfuls_insert_one(data):
         
         for execId in former_execs:
             if execId != None:
+                current_app.logger.error(f'controller: ibexecutionrestfuls, dublicates: {execId.execution_m_execId}')
                 return jsonify( {
                         'status': 'ok', 
                         'message': 'duplicate, rebooking',
