@@ -7,7 +7,7 @@
 - `BASIC_AUTH_PASSWORD=<authPassword>`
 
 ## mysql db
-`docker run --name ib-mysql -e MYSQL_RANDOM_ROOT_PASSWORD=yes -e MYSQL_DATABASE=ibdb -e MYSQL_USER=ibuser -e MYSQL_PASSWORD=<password> -p 3306:3306 -d mysql:5.6`
+`docker run --name ib-mysql -e MYSQL_RANDOM_ROOT_PASSWORD=yes -e MYSQL_DATABASE=ibdb -e MYSQL_USER=ibuser -e MYSQL_PASSWORD=<mysqlPassword> -p 3306:3306 -d mysql:5.6`
 
 
 ## phpmyadmin
@@ -15,7 +15,7 @@
 
 
 ## container backend
-`docker run --name myib -p 5000:5000 -e "MYSQL_PASSWORD=<mysqlPassord>" -e "BASIC_AUTH_USERNAME=<user>" -e "BASIC_AUTH_PASSWORD=<password>" --link ib-mysql:ib-mysql gchevalley/com-stouffcapital-ib`
+`docker run --name myib -p 5000:5000 -e "MYSQL_PASSWORD=<mysqlPassword>" -e "BASIC_AUTH_USERNAME=<user>" -e "BASIC_AUTH_PASSWORD=<password>" --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`
 
 
 ## Creating The Migration Repository
@@ -65,7 +65,13 @@ End Function
 1. `kubectl create namespace ib`
 1. `kubectl -n ib create secret generic ib --from-literal=mysql-password=<pass> --from-literal=backend-user=<user> --from-literal=backend-password=<pass> --from-literal=sentry-sdk=<sentry_sdk>`
 1. `kubectl create -f deploy/kubernetes/ib-db-pvc.yaml`
+1. `kubectl create -f deploy/kubernetes/ib-sa.yaml`
+1. `kubectl create -f deploy/kubernetes/ib-rolebinding.yaml`
 1. `kubectl create -f deploy/kubernetes/ib-backend-pvc.yaml`
 1. `kubectl create -f deploy/kubernetes/ib-mysql.yaml`
 1. `kubectl create -f deploy/kubernetes/ib-backend.yaml`
 1. `kubectl create -f deploy/kubernetes/com-stouffcapital-ib-ing-ssl.yaml`
+
+
+## restore db from mysql pod
+`mysql -u ibuser -p ibdb < ib.sql`

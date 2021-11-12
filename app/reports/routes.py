@@ -2,10 +2,12 @@ from datetime import datetime, timedelta
 from flask import render_template, flash, json, redirect, url_for, request, Response, send_file, g, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
+import time
 import csv
 import pandas as pd
 import numpy as np
 import requests
+import xml.etree.ElementTree as ET
 import xmltodict
 from app import db, alchemydumps
 from app.models import Contract, Bbg, Ibexecutionrestful
@@ -570,9 +572,6 @@ def ib_upload_eod_report():
 
 
 
-
-
-
 @bp.route('/reports/ib/eod/v2/reportDate', methods=['GET'])
 def ib_upload_eod_report_date_v2():
     try:
@@ -686,156 +685,127 @@ def ib_upload_eod_report_v2():
         return jsonify( {'status': 'error', 'error': 'unable to retrieve flex query', 'controller': 'reports'} )
 
 
-'''
-@bp.route('/reports/ib/eod/v2', methods=['GET'])
-def ib_report_eod_v2():
 
-    with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
+# autodnl with multiple tokens
+@bp.route('/reports/ib/eod/tokens', methods=['POST'])
+def ib_upload_eod_report_tokens():
+    try:
+        data = request.get_json()
+    except:
+        return jsonify( {'status': 'error', 'error': 'missing tokens', 'controller': 'reports'} )
+
+    xml = None
+
+    for fq in data["flexQueries"]:
+        current_app.logger.info(f'processing {fq["queryId"]}')
+
+        QUERY_ID = fq["queryId"]
+        TOKEN = fq["token"]
+        VERSION = '3'
+
+        res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest?t={TOKEN}&q={QUERY_ID}&v={VERSION}')
+
+        doc = xmltodict.parse(res.content)
+
+        if doc['FlexStatementResponse']['Status'] == 'Success':
+            REFERENCE_CODE = doc['FlexStatementResponse']['ReferenceCode']
+
+            res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?q={REFERENCE_CODE}&t={TOKEN}&v={VERSION}')
+
+            root =  ET.fromstring( res.content )
+
+            dnl_report_try = 0
+            dnl_report_retry = 6
+            if root.tag == 'FlexStatementResponse' and root.find("Status").text == 'Warn' and dnl_report_try < dnl_report_retry:
+
+                if root.find("ErrorCode").text == '1019':
+                    current_app.logger.info(f'flex query {QUERY_ID} report not yet ready... please wait {dnl_report_try+1}')
+                    time.sleep(10)
+                    res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?q={REFERENCE_CODE}&t={TOKEN}&v={VERSION}')
+                    root =  ET.fromstring( res.content )
+                    dnl_report_try += 1
+
+                    if dnl_report_try == dnl_report_retry:
+                        return jsonify( {'status': 'error', 'error': 'report not ready', 'controller': 'reports'} )
+            
+            with open(os.path.join(SCRIPT_ROOT + '/data/', f'{QUERY_ID}.xml'), 'wb') as file:
+                file.write( ET.tostring(root) )
+            
+            if xml is None:
+                xml = root
+            else:
+                FlexStatements = xml.find("FlexStatements") # only one
+
+                for FlexStatement in root.iter('FlexStatement'):
+                    FlexStatements.append(FlexStatement)
+            
+            with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'wb') as file:
+                file.write( ET.tostring(xml) )
+        
+        else:
+            print(doc)
+            return jsonify( {'status': 'error', 'error': f'unable to retrieve flex query {QUERY_ID}', 'controller': 'reports'} )
+
+            
+
+        
+
+    with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST)) as fd:
         doc = xmltodict.parse(fd.read())
 
-    df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
+
+    if 'FlexQueryResponse' in doc:
+
+        reportDate_str = ib_fq_dailyStatement_reportDate(doc).replace('-', '')
+
+        # update Ibcontract
+        df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
+        list_ibcontractsToCheck = []
+        fields_Ibcontract = ['assetCategory', 'symbol', 'description', 'conid', 'isin', 'listingExchange', 'underlyingConid', 'underlyingSymbol', 'underlyingSecurityID', 'underlyingListingExchange', 'multiplier', 'strike', 'expiry', 'putCall', 'maturity', 'issueDate', 'underlyingCategory', 'subCategory', 'currency']
+        for position in df_openPositions.to_dict(orient='records'):
+            # transforme into an ibcontract
+            api_Ibcontract = {}
+            for key_Ibcontract in fields_Ibcontract:
+                if key_Ibcontract in position:
+                    api_Ibcontract[key_Ibcontract] = position[key_Ibcontract]
+            list_ibcontractsToCheck.append(api_Ibcontract)
+
+            #print(api_Ibcontract)
+            #routes_ibcontract.ibcontract_create_one(api_Ibcontract)
+        current_app.logger.info(f'ib_upload_eod_report_v2:: check ibcontracts OpenPositions')
+        current_app.logger.info( f'ib_upload_eod_report_v2:: new assets from OpenPositions: {json.loads(routes_ibcontract.ibcontracts_insert_many(list_ibcontractsToCheck).data)["newAssets_count"]}' )
 
 
-    # inject intraday executions
-    list_openPositions = df_openPositions.to_dict(orient='record')
-    new_openPos = []
-    input_data = request.get_json()
+        # create ibcontract from monthly perf
+        df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
+        dict_positions = {}
+        mtd_pnl = []
+        for position in df_MTDYTDPerformanceSummary.to_dict(orient='records'):
+            if position['conid'] not in dict_positions:
+                dict_positions[ position['conid'] ] = position
+                dict_positions[ position['conid'] ]['accountId'] = 'MULTI'
+            else:
+                dict_positions[position['conid']]['mtmMTD'] = position['mtmMTD']
 
-    if input_data != None and 'execDetails' in input_data:
-        # push dans le pool in 1 call
-        routes_ibexecutionrestfuls.ibexecutionrestfuls_insert_many(input_data['execDetails'])
+        for position in dict_positions:
+            mtd_pnl.append(dict_positions[position])
+        df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
 
-
-    date_obj = json.loads( ib_upload_eod_report_date_v2().get_data() )
-    dt_report = datetime.strptime( date_obj['reportDate'], '%Y-%m-%d')
-    dt_refExec = dt_report + timedelta(days=1)
-
-    current_app.logger.info(f'ib_report_eod_v2:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
-
-
-    current_executions = json.loads( routes_ibexecutionrestfuls.list_limit_date( dt_refExec.strftime("%Y-%m-%d") ).get_data() )
-    #print( current_executions )
-
-    for ibexecutionrestful_execution_m_execId in current_executions['executions']: #dict
-
-        ibexecutionrestful = current_executions['executions'][ibexecutionrestful_execution_m_execId]
-
-        #current_app.logger.info(f'found exec {ibexecutionrestful["execution_m_execId"]} for {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]}): {ibexecutionrestful["execution_m_shares"]} @ {ibexecutionrestful["execution_m_price"]}')
-
-        found_in_daily_statement = False
-
-        for openPosition in list_openPositions:
-
-            if openPosition['conid'] == ibexecutionrestful['contract_m_conId']:
-                openPosition['position_current'] += ibexecutionrestful['execution_m_shares']
-
-                openPosition['position_d_chg'] = openPosition['position_current'] - openPosition['position_eod']
-
-                openPosition['ntcf_d_local'] -= ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier']
-
-                openPosition['costBasisMoney_d_long'] += ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] > 0 else 0
-
-                openPosition['costBasisMoney_d_short'] += ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] < 0 else 0
-
-                if openPosition['position_d_chg'] == 0:
-                    openPosition['costBasisPrice_d'] = 0
-                elif openPosition['position_d_chg'] > 0:
-                    openPosition['costBasisPrice_d'] = ( openPosition['costBasisMoney_d_long'] + openPosition['costBasisMoney_d_short'] ) / openPosition['position_d_chg']
-                elif openPosition['position_d_chg'] < 0:
-                    openPosition['costBasisPrice_d'] = ( openPosition['costBasisMoney_d_short'] + openPosition['costBasisMoney_d_long'] ) / openPosition['position_d_chg']
+        current_app.logger.info(f'ib_upload_eod_report_v2:: check ibcontracts MTDYTDPerformanceSummary')
+        current_app.logger.info( f'ib_upload_eod_report_v2:: new asset from MTDYTDPerformanceSummary: {json.loads(routes_ibcontract.ibcontracts_insert_many(mtd_pnl).data)["newAssets_count"]}' )
 
 
-                found_in_daily_statement = True
-                break
 
-        if found_in_daily_statement == False:
-
-            #current_app.logger.info(f'found exec which needs a new positions: {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]})')
-
-            list_openPositions.append({
-                'provider': 'IB'
-                'provider_account': ibexecutionrestful['execution_m_acctNumber'],
-                'strategy': "MULTI",
-                'position_current': ibexecutionrestful['execution_m_shares'],
-                'pnl_d_local': 0,
-                'pnl_y_local': 0,
-                'pnl_y_eod_local': 0,
-                'position_eod': 0,
-                'price_eod': 0,
-                'ntcf_d_local': -1 * ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
-                'Symbole': f'{ibexecutionrestful["contract_m_symbol"]}/{ibexecutionrestful["contract_m_localSymbol"]}',
-                'conid': ibexecutionrestful['contract_m_conId'],
-                'costBasisMoney_d_long': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] > 0 else 0,
-                'costBasisMoney_d_short': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] < 0 else 0,
-                'costBasisPrice_eod': 0,
-                'fifoPnlUnrealized_eod': 0,
-                'costBasisPrice_d': ibexecutionrestful['execution_m_price'] / abs(ibexecutionrestful['execution_m_shares']) if ibexecutionrestful['execution_m_shares'] != 0 else 0
-            })
+        # clean former execs
+        current_app.logger.info(f'ib_upload_eod_report_v2:: clean former executions pool before {reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}')
+        db.session.query(Ibexecutionrestful).filter(Ibexecutionrestful.execution_m_time <= f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}' ).delete()
+        db.session.commit()
 
 
-    df_openPositions = pd.DataFrame(list_openPositions)
+        return jsonify( {'status': 'ok', 'message': 'ib:: successfully retrive flex query start of the day', 'reportDate': f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}', 'controller': 'reports'} )
+    else:
+        return jsonify( {'status': 'error', 'error': 'flex query report is invalid', 'controller': 'reports'} )
 
-
-    # inject monthly pnl in base currency - ibcontracts are created with flex query results are retrieved
-    df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
-    dict_positions = {}
-    mtd_pnl = []
-    for position in df_MTDYTDPerformanceSummary.to_dict(orient='records'):
-        if position['conid'] not in dict_positions:
-            dict_positions[ position['conid'] ] = position
-            dict_positions[ position['conid'] ]['accountId'] = 'MULTI'
-        else:
-            dict_positions[position['conid']]['mtmMTD'] = position['mtmMTD']
-
-    for position in dict_positions:
-        mtd_pnl.append(dict_positions[position])
-    df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
-
-    list_openPositions = df_openPositions.to_dict(orient='record')
-
-    for monthly_pnl in df_MTDYTDPerformanceSummary.to_dict(orient='record'):
-        found_in_daily_statement = False
-        for openPosition in list_openPositions:
-            if monthly_pnl['conid'] == openPosition['conid']:
-                found_in_daily_statement = True
-                openPosition['pnl_m_eod_base'] = monthly_pnl['mtmMTD']
-                break
-
-        if found_in_daily_statement == False:
-            list_openPositions.append({
-                'provider': 'IB',
-                'strategy': "MULTI",
-                'position_current': 0,
-                'pnl_d_local': 0,
-                'pnl_y_local': 0,
-                'pnl_y_eod_local': 0,
-                'position_eod': 0,
-                'price_eod': 0,
-                'ntcf_d_local': 0,
-                'pnl_m_eod_base': monthly_pnl['mtmMTD'],
-                'Symbole': f'{monthly_pnl["symbol"]}',
-                'conid': monthly_pnl['conid'],
-            })
-
-    df_openPositions = pd.DataFrame(list_openPositions)
-
-
-    df_bridge = pd.read_sql(sql="SELECT ticker, bbgIdentifier, bbgUnderylingId, internalUnderlying, ibcontract_conid FROM ibsymbology", con=db.engine)
-
-    df_bridge.rename(columns={'ticker': 'bbg_ticker',
-                      'bbgIdentifier': 'Identifier',
-                      'bbgUnderylingId': 'bbg_underyling_id',
-                      'internalUnderlying': 'Underlying',
-                      'ibcontract_conid': 'conid', }
-             , inplace=True)
-
-    df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
-
-    # patch np.nan to json null
-    df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None)
-
-    return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions.to_dict(orient='records') } )
-'''
 
 
 @bp.route('/reports/ib/eod/v2/xls', methods=['POST'])

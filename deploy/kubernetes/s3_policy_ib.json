@@ -8,7 +8,9 @@
       "Effect": "Allow",
       "Resource": [
         "arn:aws:s3:::ibkr",
-        "arn:aws:s3:::ibkr/*"
+        "arn:aws:s3:::ibkr/*",
+		"arn:aws:s3:::tableau",
+        "arn:aws:s3:::tableau/*"
       ],
       "Sid": "ReadWriteIbkrAcl"
     }

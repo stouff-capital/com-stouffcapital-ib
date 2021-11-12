@@ -1,11 +1,11 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ingress-ib-backend
+  name: ingress-ib
   namespace: ib
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    kubernetes.io/ingress.class: nginx
+    kubernetes.io/ingress.class: "nginx"
     
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "300s"
@@ -15,14 +15,14 @@ spec:
   - hosts:
     - ib.stouffcapital.tech
     secretName: ib-stouffcapital-service-tls
-  backend:
-    serviceName: default-http-backend
-    servicePort: 80
   rules:
   - host: ib.stouffcapital.tech
     http:
       paths:
       - path: /
+        pathType: Prefix
         backend:
-          serviceName: ib-backend
-          servicePort: 5000
+          service:
+            name: ib-backend
+            port: 
+              number: 5000
