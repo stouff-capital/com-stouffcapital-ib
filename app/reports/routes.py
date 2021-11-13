@@ -819,7 +819,7 @@ def ib_report_eod_v2_xls():
 
 
     # inject intraday executions
-    list_openPositions = df_openPositions.to_dict(orient='record')
+    list_openPositions = df_openPositions.to_dict(orient='records')
     current_app.logger.info('before reading post content')
     input_data = request.get_json()
     #print(input_data)
@@ -906,7 +906,6 @@ def ib_report_eod_v2_xls():
 
 
     df_openPositions = pd.DataFrame(list_openPositions)
-    df_openPositions.loc[:, ['pnl_m_eod_base']].fillna(0, inplace=True) # only in open not in mtdpnl
 
 
     # inject monthly pnl in base currency - ibcontracts are created with flex query results are retrieved
@@ -926,9 +925,9 @@ def ib_report_eod_v2_xls():
     df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
     '''
 
-    list_openPositions = df_openPositions.to_dict(orient='record')
+    list_openPositions = df_openPositions.to_dict(orient='records')
 
-    for monthly_pnl in df_MTDYTDPerformanceSummary.to_dict(orient='record'):
+    for monthly_pnl in df_MTDYTDPerformanceSummary.to_dict(orient='records'):
         found_in_daily_statement = False
         for openPosition in list_openPositions:
             # if monthly_pnl['conid'] == openPosition['conid']:
@@ -955,6 +954,8 @@ def ib_report_eod_v2_xls():
             })
 
     df_openPositions = pd.DataFrame(list_openPositions)
+    for h in ['pnl_m_eod_base']: # pnl_m_eod_base
+        df_openPositions[h] = df_openPositions[h].fillna(0)
 
 
     df_bridge = pd.read_sql(sql="SELECT ticker, bbgIdentifier, bbgUnderylingId, internalUnderlying, ibcontract_conid FROM ibsymbology", con=db.engine)
