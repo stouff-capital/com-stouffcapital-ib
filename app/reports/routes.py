@@ -906,6 +906,7 @@ def ib_report_eod_v2_xls():
 
 
     df_openPositions = pd.DataFrame(list_openPositions)
+    df_openPositions.loc[:, ['pnl_m_eod_base']].fillna(0, inplace=True) # only in open not in mtdpnl
 
 
     # inject monthly pnl in base currency - ibcontracts are created with flex query results are retrieved
