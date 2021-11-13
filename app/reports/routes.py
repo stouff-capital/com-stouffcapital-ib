@@ -954,7 +954,7 @@ def ib_report_eod_v2_xls():
             })
 
     df_openPositions = pd.DataFrame(list_openPositions)
-    for h in ['pnl_m_eod_base']: # pnl_m_eod_base
+    for h in ['ntcf_d_local', 'pnl_d_local', 'pnl_m_eod_base', 'pnl_y_eod_local', 'pnl_y_local', 'position_current', 'position_eod', 'price_eod', 'costBasisPrice_eod', 'costBasisPrice_d']: # pnl_m_eod_base
         df_openPositions[h] = df_openPositions[h].fillna(0)
 
 
@@ -970,9 +970,11 @@ def ib_report_eod_v2_xls():
     df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
 
     # patch np.nan to json null
-    df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None)
+    df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None) # doesn't seem to work anymore
 
-    return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions.to_dict(orient='records') } )
+    headers_subset = ['conid', 'Identifier', 'Symbole', 'bbg_ticker', 'bbg_underyling_id', 'Underlying', 'provider', 'provider_account', 'strategy', 'ntcf_d_local', 'pnl_d_local', 'pnl_m_eod_base', 'pnl_y_eod_local', 'pnl_y_local', 'position_current', 'position_eod', 'price_eod', 'costBasisPrice_eod', 'costBasisPrice_d' ]
+
+    return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions[headers_subset].to_dict(orient='records') } )
 
 
 
