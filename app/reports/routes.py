@@ -716,7 +716,7 @@ def ib_upload_eod_report_tokens():
 
             dnl_report_try = 0
             dnl_report_retry = 6
-            if root.tag == 'FlexStatementResponse' and root.find("Status").text == 'Warn' and dnl_report_try < dnl_report_retry:
+            while root.tag == 'FlexStatementResponse' and root.find("Status").text == 'Warn' and dnl_report_try < dnl_report_retry:
 
                 if root.find("ErrorCode").text == '1019':
                     current_app.logger.info(f'flex query {QUERY_ID} report not yet ready... please wait {dnl_report_try+1}')
@@ -970,7 +970,8 @@ def ib_report_eod_v2_xls():
     df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
 
     # patch np.nan to json null
-    df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None) # doesn't seem to work anymore
+    #df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None) # doesn't seem to work anymore
+    df_openPositions = df_openPositions.astype(object).where((pd.notnull(df_openPositions)), None)
 
     headers_subset = ['conid', 'Identifier', 'Symbole', 'bbg_ticker', 'bbg_underyling_id', 'Underlying', 'provider', 'provider_account', 'strategy', 'ntcf_d_local', 'pnl_d_local', 'pnl_m_eod_base', 'pnl_y_eod_local', 'pnl_y_local', 'position_current', 'position_eod', 'price_eod', 'costBasisPrice_eod', 'costBasisPrice_d' ]
 
