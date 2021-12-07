@@ -811,37 +811,50 @@ def ib_upload_eod_report_tokens():
 @bp.route('/reports/ib/eod/v2/xls', methods=['POST'])
 def ib_report_eod_v2_xls():
     current_app.logger.info('in /reports/ib/eod/v2/xls')
+
+    current_app.logger.info('before reading user post content (exec, limit account)')
+    input_data = request.get_json()
+    #print(input_data)
+    current_app.logger.info('after reading user post content')
+
+    if input_data != None and 'execDetails' in input_data:
+        current_app.logger.info('found execDetails')
+        # push dans le pool in 1 call
+        current_app.logger.info('before pushing execDetails in pool')
+        routes_ibexecutionrestfuls.ibexecutionrestfuls_insert_many(input_data['execDetails'])
+        current_app.logger.info('after pushing execDetails in pool, done with user post executions')
+
     with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
         doc = xmltodict.parse(fd.read())
     current_app.logger.info('after opening full report fq')
+
+    current_app.logger.info('before reading open positions full report')
     df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
+    current_app.logger.info('after reading open positions full report')
+    
+    # limit for 1 account
+    if 'account' in input_data:
+        current_app.logger.info('found limit account in user data')
+        df_openPositions = df_openPositions[ df_openPositions['provider_account'] == input_data['account'] ]
+        current_app.logger.info(f'after limiting df_openPositions with account { input_data["account"]}')
+    list_openPositions = df_openPositions.to_dict(orient='records')
+
     current_app.logger.info('after retrieving open position from fq report')
 
 
     # inject intraday executions
-    list_openPositions = df_openPositions.to_dict(orient='records')
-    current_app.logger.info('before reading post content')
-    input_data = request.get_json()
-    #print(input_data)
-    current_app.logger.info('after reading post content')
-
-    if input_data != None and 'execDetails' in input_data:
-        current_app.logger.info('post execs')
-        # push dans le pool in 1 call
-        routes_ibexecutionrestfuls.ibexecutionrestfuls_insert_many(input_data['execDetails'])
-        current_app.logger.info('after reading post content')
-
     current_app.logger.info('before call ib_upload_eod_report_date_v2()')
     date_obj = json.loads( ib_upload_eod_report_date_v2().get_data() )
     current_app.logger.info('after call ib_upload_eod_report_date_v2()')
     dt_report = datetime.strptime( date_obj['reportDate'], '%Y-%m-%d')
     dt_refExec = dt_report + timedelta(days=1)
 
-    current_app.logger.info(f'ib_report_eod_v2:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
+    current_app.logger.info(f'ib_report_eod_v2_xls:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
 
 
     current_executions = json.loads( routes_ibexecutionrestfuls.list_limit_date( dt_refExec.strftime("%Y-%m-%d") ).get_data() )
     #print( current_executions )
+    current_app.logger.info(f'after retrieving today executions')
 
     for ibexecutionrestful_execution_m_execId in current_executions['executions']: #dict
 
@@ -907,9 +920,18 @@ def ib_report_eod_v2_xls():
 
     df_openPositions = pd.DataFrame(list_openPositions)
 
+    current_app.logger.info(f'after merging open positions with intraday executions, positions: {len(df_openPositions)}')    
+
 
     # inject monthly pnl in base currency - ibcontracts are created with flex query results are retrieved
     df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
+    current_app.logger.info(f'after reading mtd pnl report')
+
+    if 'account' in input_data:
+        current_app.logger.info('found limit account in user data')
+        df_MTDYTDPerformanceSummary = df_MTDYTDPerformanceSummary[ df_MTDYTDPerformanceSummary['accountId'] == input_data['account'] ]
+        current_app.logger.info(f'after limiting df_MTDYTDPerformanceSummary with account { input_data["account"]}')
+
     '''
     dict_positions = {}
     mtd_pnl = []
@@ -957,7 +979,7 @@ def ib_report_eod_v2_xls():
     for h in ['ntcf_d_local', 'pnl_d_local', 'pnl_m_eod_base', 'pnl_y_eod_local', 'pnl_y_local', 'position_current', 'position_eod', 'price_eod', 'costBasisPrice_eod', 'costBasisPrice_d']: # pnl_m_eod_base
         df_openPositions[h] = df_openPositions[h].fillna(0)
 
-
+    current_app.logger.info(f'before retrieving bridge from db')   
     df_bridge = pd.read_sql(sql="SELECT ticker, bbgIdentifier, bbgUnderylingId, internalUnderlying, ibcontract_conid FROM ibsymbology", con=db.engine)
 
     df_bridge.rename(columns={'ticker': 'bbg_ticker',
@@ -966,8 +988,10 @@ def ib_report_eod_v2_xls():
                       'internalUnderlying': 'Underlying',
                       'ibcontract_conid': 'conid', }
              , inplace=True)
+    current_app.logger.info(f'after retrieving bridge from db')  
 
     df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
+    current_app.logger.info(f'after merging bridge with positions')  
 
     # patch np.nan to json null
     #df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None) # doesn't seem to work anymore
