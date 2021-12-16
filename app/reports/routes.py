@@ -1111,8 +1111,14 @@ def ib_report_eod_v2_xls_fast():
 
     df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
     current_app.logger.info(f'after merging bridge with positions')
+
+    if 'account' in input_data:
+        current_app.logger.info('found limit account in user data')
+        df_openPositions = df_openPositions[ df_openPositions['provider_account'] == input_data['account'] ]
+        current_app.logger.info(f'after limiting with account { input_data["account"]}')
     
-    
+
+    # new fields
     df_openPositions['CUSTOM_accpbpid'] = [f'MULTI_IB_{Identifier}' for Identifier in df_openPositions['Identifier'] ]
 
 
@@ -1126,6 +1132,7 @@ def ib_report_eod_v2_xls_fast():
     #df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None) # doesn't seem to work anymore
     df_openPositions = df_openPositions.astype(object).where((pd.notnull(df_openPositions)), None)
 
+    headers_subset = [ 'conid', 'bbg_ticker', 'provider_account', 'CUSTOM_accpbpid', 'ntcf_d_local', 'position_current']
     headers_subset = [ 'CUSTOM_accpbpid', 'ntcf_d_local', 'position_current']
 
     return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions[headers_subset].to_dict(orient='records') } )
