@@ -17,6 +17,8 @@
 
 ## container backend
 
+`docker build -t stouffcapital/com-stouffcapital-ib .`
+
 `docker run --name myib -p 5000:5000 -e "MYSQL_PASSWORD=<mysqlPassword>" -e "BASIC_AUTH_USERNAME=<user>" -e "BASIC_AUTH_PASSWORD=<password>" --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`
 
 `docker run -it --rm --name myib -p 5000:5000 --env-file=.env --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`

@@ -1003,6 +1003,134 @@ def ib_report_eod_v2_xls():
 
 
 
+@bp.route('/reports/ib/eod/v2/xls/fast', methods=['POST'])
+def ib_report_eod_v2_xls_fast():
+    current_app.logger.info('in /reports/ib/eod/v2/xls/fast')
+
+    current_app.logger.info('before reading user post content (exec, limit account)')
+    input_data = request.get_json()
+    #print(input_data)
+    current_app.logger.info('after reading user post content')
+
+    if input_data != None and 'execDetails' in input_data:
+        current_app.logger.info('found execDetails')
+        # push dans le pool in 1 call
+        current_app.logger.info('before pushing execDetails in pool')
+        routes_ibexecutionrestfuls.ibexecutionrestfuls_insert_many(input_data['execDetails'])
+        current_app.logger.info('after pushing execDetails in pool, done with user post executions')
+
+    with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
+        doc = xmltodict.parse(fd.read())
+    current_app.logger.info('after opening full report fq')
+
+    current_app.logger.info('before reading open positions full report')
+    df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
+    current_app.logger.info('after reading open positions full report')
+    
+    # limit for 1 account
+    if 'account' in input_data:
+        current_app.logger.info('found limit account in user data')
+        df_openPositions = df_openPositions[ df_openPositions['provider_account'] == input_data['account'] ]
+        current_app.logger.info(f'after limiting df_openPositions with account { input_data["account"]}')
+    list_openPositions = df_openPositions.to_dict(orient='records')
+
+    current_app.logger.info('after retrieving open position from fq report')
+
+
+    # inject intraday executions
+    current_app.logger.info('before call ib_upload_eod_report_date_v2()')
+    date_obj = json.loads( ib_upload_eod_report_date_v2().get_data() )
+    current_app.logger.info('after call ib_upload_eod_report_date_v2()')
+    dt_report = datetime.strptime( date_obj['reportDate'], '%Y-%m-%d')
+    dt_refExec = dt_report + timedelta(days=1)
+
+    current_app.logger.info(f'ib_report_eod_v2_xls:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
+
+
+    current_executions = json.loads( routes_ibexecutionrestfuls.list_limit_date( dt_refExec.strftime("%Y-%m-%d") ).get_data() )
+    #print( current_executions )
+    current_app.logger.info(f'after retrieving today executions')
+
+    for ibexecutionrestful_execution_m_execId in current_executions['executions']: #dict
+
+        ibexecutionrestful = current_executions['executions'][ibexecutionrestful_execution_m_execId]
+
+        if ibexecutionrestful['execution_m_acctNumber'][-1] == 'F':
+            ibexecutionrestful['execution_m_acctNumber'] = ibexecutionrestful['execution_m_acctNumber'][:-1]
+
+        #current_app.logger.info(f'found exec {ibexecutionrestful["execution_m_execId"]} for {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]}): {ibexecutionrestful["execution_m_shares"]} @ {ibexecutionrestful["execution_m_price"]}')
+
+        found_in_daily_statement = False
+
+        for openPosition in list_openPositions:
+
+            # if openPosition['conid'] == ibexecutionrestful['contract_m_conId']:
+            if openPosition['conid'] == ibexecutionrestful['contract_m_conId'] and openPosition['provider_account'] == ibexecutionrestful['execution_m_acctNumber']: # same asset & same account
+                openPosition['position_current'] += ibexecutionrestful['execution_m_shares']
+
+                openPosition['ntcf_d_local'] -= ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier']
+
+
+                found_in_daily_statement = True
+                break
+
+        if found_in_daily_statement == False:
+
+            #current_app.logger.info(f'found exec which needs a new positions: {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]})')
+
+            list_openPositions.append({
+                'provider': 'IB', 
+                'provider_account': ibexecutionrestful['execution_m_acctNumber'],
+                'strategy': "MULTI",
+                'position_current': ibexecutionrestful['execution_m_shares'], 
+                'position_eod': 0,
+                'ntcf_d_local': -1 * ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
+                'conid': ibexecutionrestful['contract_m_conId'],
+
+            })
+
+
+    df_openPositions = pd.DataFrame(list_openPositions)
+
+    current_app.logger.info(f'after merging open positions with intraday executions, positions: {len(df_openPositions)}')    
+
+
+    for h in ['ntcf_d_local', 'position_current', 'position_eod']:
+        df_openPositions[h] = df_openPositions[h].fillna(0)
+
+    current_app.logger.info(f'before retrieving bridge from db')   
+    df_bridge = pd.read_sql(sql="SELECT ticker, bbgIdentifier, bbgUnderylingId, internalUnderlying, ibcontract_conid FROM ibsymbology", con=db.engine)
+
+    df_bridge.rename(columns={'ticker': 'bbg_ticker',
+                      'bbgIdentifier': 'Identifier',
+                      'bbgUnderylingId': 'bbg_underyling_id',
+                      'internalUnderlying': 'Underlying',
+                      'ibcontract_conid': 'conid', }
+             , inplace=True)
+    current_app.logger.info(f'after retrieving bridge from db')  
+
+    df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
+    current_app.logger.info(f'after merging bridge with positions')
+    
+    
+    df_openPositions['CUSTOM_accpbpid'] = [f'MULTI_IB_{Identifier}' for Identifier in df_openPositions['Identifier'] ]
+
+
+    # subset with trading only
+    df_openPositions = df_openPositions[ (df_openPositions['ntcf_d_local'] !=0) | (df_openPositions['position_current'] != df_openPositions['position_eod']) ]
+
+    current_app.logger.info(f'positions with intraday trading: {len(df_openPositions)}')    
+    
+
+    # patch np.nan to json null
+    #df_openPositions = df_openPositions.where((pd.notnull(df_openPositions)), None) # doesn't seem to work anymore
+    df_openPositions = df_openPositions.astype(object).where((pd.notnull(df_openPositions)), None)
+
+    headers_subset = [ 'CUSTOM_accpbpid', 'ntcf_d_local', 'position_current']
+
+    return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions[headers_subset].to_dict(orient='records') } )
+
+
 # daily statement blocs
 def ib_fq_dailyStatement_FlexStatements(doc):
     if "FlexQueryResponse" in doc:
