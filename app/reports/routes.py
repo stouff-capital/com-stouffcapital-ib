@@ -949,7 +949,7 @@ def ib_report_eod_v2_xls():
 
     list_openPositions = df_openPositions.to_dict(orient='records')
 
-    for monthly_pnl in df_MTDYTDPerformanceSummary.to_dict(orient='records'):
+    for monthly_pnl in df_MTDYTDPerformanceSummary[ df_MTDYTDPerformanceSummary["mtmMTD"] != 0 ].to_dict(orient='records'):
         found_in_daily_statement = False
         for openPosition in list_openPositions:
             # if monthly_pnl['conid'] == openPosition['conid']:
@@ -976,6 +976,9 @@ def ib_report_eod_v2_xls():
             })
 
     df_openPositions = pd.DataFrame(list_openPositions)
+    current_app.logger.info(f'after merging open positions with mtd pnl: {len(df_openPositions)}')  
+
+
     for h in ['ntcf_d_local', 'pnl_d_local', 'pnl_m_eod_base', 'pnl_y_eod_local', 'pnl_y_local', 'position_current', 'position_eod', 'price_eod', 'costBasisPrice_eod', 'costBasisPrice_d']: # pnl_m_eod_base
         df_openPositions[h] = df_openPositions[h].fillna(0)
 
