@@ -1282,10 +1282,13 @@ def ib_fq_dailyStatement_OpenPositions(doc):
     data_openPositions = []
     distinct_positions = {}
     for FlexStatement in list_FlexStatements:
-        if isinstance( FlexStatement['OpenPositions']['OpenPosition'], list): # more than 1 item
-            list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
+        if FlexStatement['OpenPositions'] is None:
+            list_OpenPositions = []
         else:
-            list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
+            if isinstance( FlexStatement['OpenPositions']['OpenPosition'], list): # more than 1 item
+                list_OpenPositions = FlexStatement['OpenPositions']['OpenPosition']
+            else:
+                list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
 
         floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV', 'costBasisMoney', 'costBasisPrice', 'fifoPnlUnrealized', 'multiplier']
         intfields_OpenPosition = ['conid', 'position']
