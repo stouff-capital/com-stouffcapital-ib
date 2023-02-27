@@ -1314,6 +1314,9 @@ def ib_report_eod_v3_xls():
              , inplace=True)
     current_app.logger.info(f'after retrieving bridge from db')
 
+    df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
+    current_app.logger.info(f'after merging bridge with positions')  
+
     df_underlying_pnl_m_eod_base = df_openPositions.groupby(by='Underlying', as_index=False)[['pnl_m_eod_base']].sum()
     dict_underyling_mtd_pnl = {}
     for row in df_underlying_pnl_m_eod_base.to_dict(orient='records'):
@@ -1323,9 +1326,6 @@ def ib_report_eod_v3_xls():
     dict_conid_mtd_pnl = {}
     for row in df_conid_pnl_m_eod_base.to_dict(orient='records'):
         dict_conid_mtd_pnl[ row['conid'] ] = row['pnl_m_eod_base']
-
-    df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
-    current_app.logger.info(f'after merging bridge with positions')  
 
     df_openPositions_open_only = df_openPositions[ (df_openPositions['position_current'] != 0) | (df_openPositions['position_eod'] != 0) | (df_openPositions['ntcf_d_local'] != 0) ].reset_index(drop=True)
     current_app.logger.info(f'after dataset open positions only') 
