@@ -1141,6 +1141,236 @@ def ib_report_eod_v2_xls_fast():
     return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions[headers_subset].to_dict(orient='records') } )
 
 
+
+
+
+@bp.route('/reports/ib/eod/v3/xls', methods=['POST'])
+def ib_report_eod_v3_xls():
+    current_app.logger.info('in /reports/ib/eod/v3/xls')
+
+    current_app.logger.info('before reading user post content (exec, limit account)')
+    input_data = request.get_json()
+    #print(input_data)
+    current_app.logger.info('after reading user post content')
+
+    if input_data != None and 'execDetails' in input_data:
+        current_app.logger.info('found execDetails')
+        # push dans le pool in 1 call
+        current_app.logger.info('before pushing execDetails in pool')
+        routes_ibexecutionrestfuls.ibexecutionrestfuls_insert_many(input_data['execDetails'])
+        current_app.logger.info('after pushing execDetails in pool, done with user post executions')
+
+    with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'r') as fd:
+        doc = xmltodict.parse(fd.read())
+    current_app.logger.info('after opening full report fq')
+
+    current_app.logger.info('before reading open positions full report')
+    df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
+    current_app.logger.info('after reading open positions full report')
+    
+    # limit for 1 account
+    if 'account' in input_data:
+        current_app.logger.info('found limit account in user data')
+        df_openPositions = df_openPositions[ df_openPositions['provider_account'] == input_data['account'] ]
+        current_app.logger.info(f'after limiting df_openPositions with account { input_data["account"]}')
+    list_openPositions = df_openPositions.to_dict(orient='records')
+
+    current_app.logger.info('after retrieving open position from fq report')
+
+
+    # inject intraday executions
+    current_app.logger.info('before call ib_upload_eod_report_date_v2()')
+    date_obj = json.loads( ib_upload_eod_report_date_v2().get_data() )
+    current_app.logger.info('after call ib_upload_eod_report_date_v2()')
+    dt_report = datetime.strptime( date_obj['reportDate'], '%Y-%m-%d')
+    dt_refExec = dt_report + timedelta(days=1)
+
+    current_app.logger.info(f'ib_report_eod_v2_xls:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
+
+
+    current_executions = json.loads( routes_ibexecutionrestfuls.list_limit_date( dt_refExec.strftime("%Y-%m-%d") ).get_data() )
+    #print( current_executions )
+    current_app.logger.info(f'after retrieving today executions')
+
+    for ibexecutionrestful_execution_m_execId in current_executions['executions']: #dict
+
+        ibexecutionrestful = current_executions['executions'][ibexecutionrestful_execution_m_execId]
+
+        if ibexecutionrestful['execution_m_acctNumber'][-1] == 'F':
+            ibexecutionrestful['execution_m_acctNumber'] = ibexecutionrestful['execution_m_acctNumber'][:-1]
+
+        #current_app.logger.info(f'found exec {ibexecutionrestful["execution_m_execId"]} for {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]}): {ibexecutionrestful["execution_m_shares"]} @ {ibexecutionrestful["execution_m_price"]}')
+
+        found_in_daily_statement = False
+
+        for openPosition in list_openPositions:
+
+            # if openPosition['conid'] == ibexecutionrestful['contract_m_conId']:
+            if openPosition['conid'] == ibexecutionrestful['contract_m_conId'] and openPosition['provider_account'] == ibexecutionrestful['execution_m_acctNumber']: # same asset & same account
+                openPosition['position_current'] += ibexecutionrestful['execution_m_shares']
+
+                openPosition['position_d_chg'] = openPosition['position_current'] - openPosition['position_eod']
+
+                openPosition['ntcf_d_local'] -= ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier']
+
+                openPosition['costBasisMoney_d_long'] += ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] > 0 else 0
+
+                openPosition['costBasisMoney_d_short'] += ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] < 0 else 0
+
+                if openPosition['position_d_chg'] == 0:
+                    openPosition['costBasisPrice_d'] = 0
+                elif openPosition['position_d_chg'] > 0:
+                    openPosition['costBasisPrice_d'] = ( openPosition['costBasisMoney_d_long'] + openPosition['costBasisMoney_d_short'] ) / openPosition['position_d_chg']
+                elif openPosition['position_d_chg'] < 0:
+                    openPosition['costBasisPrice_d'] = ( openPosition['costBasisMoney_d_short'] + openPosition['costBasisMoney_d_long'] ) / openPosition['position_d_chg']
+
+
+                found_in_daily_statement = True
+                break
+
+        if found_in_daily_statement == False:
+
+            #current_app.logger.info(f'found exec which needs a new positions: {ibexecutionrestful["contract_m_symbol"]} ({ibexecutionrestful["contract_m_multiplier"]})')
+
+            list_openPositions.append({
+                'provider': 'IB', 
+                'provider_account': ibexecutionrestful['execution_m_acctNumber'],
+                #'strategy': api_OpenPosition['execution_m_acctNumber'],
+                'strategy': "MULTI",
+                'position_current': ibexecutionrestful['execution_m_shares'],
+                'pnl_d_local': 0,
+                'pnl_y_local': 0,
+                'pnl_y_eod_local': 0,
+                'position_eod': 0,
+                'price_eod': 0,
+                'ntcf_d_local': -1 * ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
+                'Symbole': f'{ibexecutionrestful["contract_m_symbol"]}/{ibexecutionrestful["contract_m_localSymbol"]}',
+                'conid': ibexecutionrestful['contract_m_conId'],
+                'costBasisMoney_d_long': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] > 0 else 0,
+                'costBasisMoney_d_short': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] < 0 else 0,
+                'costBasisPrice_eod': 0,
+                'fifoPnlUnrealized_eod': 0,
+                'costBasisPrice_d': ibexecutionrestful['execution_m_price'] / abs(ibexecutionrestful['execution_m_shares']) if ibexecutionrestful['execution_m_shares'] != 0 else 0
+            })
+
+
+    df_openPositions = pd.DataFrame(list_openPositions)
+
+    current_app.logger.info(f'after merging open positions with intraday executions, positions: {len(df_openPositions)}')    
+
+
+    # inject monthly pnl in base currency - ibcontracts are created with flex query results are retrieved
+    df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
+    current_app.logger.info(f'after reading mtd pnl report')
+
+    if 'account' in input_data:
+        current_app.logger.info('found limit account in user data')
+        df_MTDYTDPerformanceSummary = df_MTDYTDPerformanceSummary[ df_MTDYTDPerformanceSummary['accountId'] == input_data['account'] ]
+        current_app.logger.info(f'after limiting df_MTDYTDPerformanceSummary with account { input_data["account"]}')
+
+
+    list_openPositions = df_openPositions.to_dict(orient='records')
+
+    for monthly_pnl in df_MTDYTDPerformanceSummary[ df_MTDYTDPerformanceSummary["mtmMTD"] != 0 ].to_dict(orient='records'):
+        found_in_daily_statement = False
+        for openPosition in list_openPositions:
+            if monthly_pnl['conid'] == openPosition['conid'] and monthly_pnl['accountId'] == openPosition['provider_account']:
+                found_in_daily_statement = True
+                openPosition['pnl_m_eod_base'] = monthly_pnl['mtmMTD']
+                break
+
+        if found_in_daily_statement == False:
+            list_openPositions.append({
+                'provider': 'IB',
+                'provider_account': monthly_pnl['accountId'],
+                'strategy': "MULTI",
+                'position_current': 0,
+                'pnl_d_local': 0,
+                'pnl_y_local': 0,
+                'pnl_y_eod_local': 0,
+                'position_eod': 0,
+                'price_eod': 0,
+                'ntcf_d_local': 0,
+                'pnl_m_eod_base': monthly_pnl['mtmMTD'],
+                'Symbole': f'{monthly_pnl["symbol"]}',
+                'conid': monthly_pnl['conid'],
+            })
+
+    df_openPositions = pd.DataFrame(list_openPositions)
+    current_app.logger.info(f'after merging open positions with mtd pnl: {len(df_openPositions)}')  
+
+
+    for h in ['ntcf_d_local', 'pnl_d_local', 'pnl_m_eod_base', 'pnl_y_eod_local', 'pnl_y_local', 'position_current', 'position_eod', 'price_eod', 'costBasisPrice_eod', 'costBasisPrice_d']: # pnl_m_eod_base
+        df_openPositions[h] = df_openPositions[h].fillna(0)
+
+    current_app.logger.info(f'before retrieving bridge from db')   
+    df_bridge = pd.read_sql(sql="SELECT ticker, bbgIdentifier, bbgUnderylingId, internalUnderlying, ibcontract_conid FROM ibsymbology", con=db.engine)
+
+    df_bridge.rename(columns={'ticker': 'bbg_ticker',
+                      'bbgIdentifier': 'Identifier',
+                      'bbgUnderylingId': 'bbg_underyling_id',
+                      'internalUnderlying': 'Underlying',
+                      'ibcontract_conid': 'conid', }
+             , inplace=True)
+    current_app.logger.info(f'after retrieving bridge from db')
+
+    df_underlying_pnl_m_eod_base = df_openPositions.groupby(by='Underlying', as_index=False)[['pnl_m_eod_base']].sum()
+    dict_underyling_mtd_pnl = {}
+    for row in df_underlying_pnl_m_eod_base.to_dict(orient='records'):
+        dict_underyling_mtd_pnl[ row['Underlying'] ] = row['pnl_m_eod_base']
+    
+    df_conid_pnl_m_eod_base = df_openPositions.groupby(by='conid', as_index=False)[['pnl_m_eod_base']].sum()
+    dict_conid_mtd_pnl = {}
+    for row in df_conid_pnl_m_eod_base.to_dict(orient='records'):
+        dict_conid_mtd_pnl[ row['conid'] ] = row['pnl_m_eod_base']
+
+    df_openPositions = pd.merge(df_openPositions, df_bridge, on=['conid'], how='left')
+    current_app.logger.info(f'after merging bridge with positions')  
+
+    df_openPositions_open_only = df_openPositions[ (df_openPositions['position_current'] != 0) | (df_openPositions['position_eod'] != 0) | (df_openPositions['ntcf_d_local'] != 0) ].reset_index(drop=True)
+    current_app.logger.info(f'after dataset open positions only') 
+
+    df_openPositions_underylingClose_with_m_pnl = df_openPositions[ df_openPositions['Underlying'].isin(df_underlying_pnl_m_eod_base[ ~df_underlying_pnl_m_eod_base['Underlying'].isin( df_openPositions_open_only['Underlying'] ) ]['Underlying']) ].reset_index(drop=True)
+    current_app.logger.info(f'after dataset underyling with monthly pnl without open positions') 
+
+    df_openPositions_min_rows = pd.concat([df_openPositions_open_only, df_openPositions_underylingClose_with_m_pnl], ignore_index=True).sort_values(by='bbg_ticker', ignore_index=True)
+    current_app.logger.info(f'after smaller new dataset for fa_data') 
+    
+    
+    list_underyling_proceeding = []
+    data = []
+    for row in df_openPositions_min_rows.to_dict(orient='records'):
+        if pd.isnull(row['Underlying']) == False:
+            if row['Underlying'] in list_underyling_proceeding:
+                row['pnl_m_eod_base'] = 0
+            else:
+                if row['Underlying'] in dict_underyling_mtd_pnl:
+                    row['pnl_m_eod_base'] = dict_underyling_mtd_pnl[ row['Underlying'] ]
+                    list_underyling_proceeding.append( row['Underlying'] )
+                else:
+                    row['pnl_m_eod_base'] = 0
+                    current_app.logger.info(f'missing monthly pnl row["Underlying"]')  
+        else:
+            if row['conid'] in dict_conid_mtd_pnl:
+                row['pnl_m_eod_base'] = dict_conid_mtd_pnl[ row['conid'] ]
+            else:
+                row['pnl_m_eod_base'] = 0
+                current_app.logger.info(f'missing monthly pnl row["conid"]')  
+        data.append( row )
+    df_openPositions_min_rows_with_monthly_pnl_once = pd.DataFrame( data )
+
+
+    # patch np.nan to json null
+    df_openPositions_min_rows_with_monthly_pnl_once = df_openPositions_min_rows_with_monthly_pnl_once.astype(object).where((pd.notnull(df_openPositions_min_rows_with_monthly_pnl_once)), None)
+
+    headers_subset = ['conid', 'Identifier', 'Symbole', 'bbg_ticker', 'bbg_underyling_id', 'Underlying', 'provider', 'provider_account', 'strategy', 'ntcf_d_local', 'pnl_d_local', 'pnl_m_eod_base', 'pnl_y_eod_local', 'pnl_y_local', 'position_current', 'position_eod', 'price_eod', 'costBasisPrice_eod', 'costBasisPrice_d' ]
+
+    return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions_min_rows_with_monthly_pnl_once), 'data': df_openPositions_min_rows_with_monthly_pnl_once[headers_subset].to_dict(orient='records') } )
+
+
+
+
+
 # daily statement blocs
 def ib_fq_dailyStatement_FlexStatements(doc):
     if "FlexQueryResponse" in doc:
