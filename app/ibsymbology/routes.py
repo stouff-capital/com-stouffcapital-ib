@@ -5,8 +5,6 @@ from app.models import Ibcontract, Ibexecutionrestful, Ibsymbology
 from app.ibsymbology import bp
 import pandas as pd
 
-from app.bridge import routes as routes_bridge
-
 
 @bp.route('/ibsymbology', methods=['GET'])
 def list():
@@ -60,7 +58,6 @@ def create():
             # update ?
             current_app.logger.info(f'{data["conid"]} already in ibsymbology')
             return jsonify( {'status': 'error', 'error': 'already in ibsymbology', 'inputData': data, 'ibsymbology': {'conid': ibsymbology.ibcontract_conid, 'ticker': ibsymbology.ticker}, 'controller': 'ibsymbology'} )
-            pass
         else:
             try:
                 ibsymbology = Ibsymbology(

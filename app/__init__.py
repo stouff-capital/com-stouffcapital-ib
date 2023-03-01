@@ -33,15 +33,6 @@ def create_app(config_class=Config):
 
     alchemydumps.init_app(app, db)
 
-    from app.contracts import bp as contracts_bp
-    app.register_blueprint(contracts_bp)
-
-    from app.executions import bp as executions_bp
-    app.register_blueprint(executions_bp)
-
-    from app.bridge import bp as bridge_bp
-    app.register_blueprint(bridge_bp)
-
     from app.reports import bp as reports_bp
     app.register_blueprint(reports_bp)
 

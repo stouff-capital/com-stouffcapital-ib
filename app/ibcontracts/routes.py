@@ -105,7 +105,6 @@ def ibcontract_create():
 
 def ibcontracts_insert_many(data):
 
-    #ibcontracts = Ibcontract.query.all()
     ibcontracts = [c[0] for c in Ibcontract.query.with_entities(Ibcontract.conid).all() ]
 
     newAsset_count = 0

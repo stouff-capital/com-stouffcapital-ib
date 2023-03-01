@@ -9,6 +9,7 @@ Flask-SQLAlchemy
 gunicorn
 mysql-connector-python
 pandas
+pyarrow
 python-dateutil
 python-dotenv
 requests

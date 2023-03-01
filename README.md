@@ -13,15 +13,15 @@
 
 ## phpmyadmin
 
-`docker run --name myadmin -d --link ib-mysql:db -p 8080:80 phpmyadmin/phpmyadmin`
+`docker run --name ib-myadmin -d --link ib-mysql:db -p 8080:80 phpmyadmin/phpmyadmin`
 
 ## container backend
 
 `docker build -t stouffcapital/com-stouffcapital-ib .`
 
-`docker run --name myib -p 5000:5000 -e "MYSQL_PASSWORD=<mysqlPassword>" -e "BASIC_AUTH_USERNAME=<user>" -e "BASIC_AUTH_PASSWORD=<password>" --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`
+`docker run --name com-stouffcapital-ib -p 5000:5000 -e "MYSQL_PASSWORD=<mysqlPassword>" -e "BASIC_AUTH_USERNAME=<user>" -e "BASIC_AUTH_PASSWORD=<password>" --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`
 
-`docker run -it --rm --name myib -p 5000:5000 --env-file=.env --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`
+`docker run -it --rm --name com-stouffcapital-ib -p 5000:5000 --env-file=.env --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`
 
 ## Creating The Migration Repository
 

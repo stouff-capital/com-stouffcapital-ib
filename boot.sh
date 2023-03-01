@@ -9,5 +9,4 @@ while true; do
     sleep 5
 done
 
-#exec python com-stouffcapital-ib.py
 exec gunicorn -b :5000 --access-logfile - --error-logfile - --timeout 90 com-stouffcapital-ib:app
