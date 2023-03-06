@@ -308,5 +308,3 @@ def check_new_assets():
         '?strike': df_strike.to_dict(orient='records'),
     })
 
-
-
