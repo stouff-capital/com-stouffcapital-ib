@@ -744,7 +744,61 @@ def ib_report_eod_v3_xls():
 
     current_app.logger.info(f'ib_report_eod_v2_xls:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
 
+    if 'account' in input_data:
+        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time > '{dt_refExec.strftime('%Y-%m-%d')}' AND execution_m_acctNumber = '{input_data['account']}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
+    else:
+        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time > '{dt_refExec.strftime('%Y-%m-%d')}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
+    current_app.logger.info(f'after retrieving today aggregate executions ')
 
+    for aggr_execs in aggr_executions:
+
+        if aggr_execs['execution_m_acctNumber'][-1] == 'F':
+            aggr_execs['execution_m_acctNumber'] = aggr_execs['execution_m_acctNumber'][:-1]
+        found_in_daily_statement = False
+        check_account = True
+
+        if 'account' in input_data:
+            if aggr_execs['execution_m_acctNumber'] == input_data["account"]:
+                check_account = True
+            else:
+                check_account = False
+        
+        for openPosition in list_openPositions:
+
+            if int(openPosition['conid']) == int(aggr_execs['ibcontract_conid']) and openPosition['provider_account'] == aggr_execs['execution_m_acctNumber']: # same asset & same account
+                openPosition['position_current'] += int(aggr_execs['intraday_net_trading_qty'])
+
+                openPosition['position_d_chg'] = openPosition['position_current'] - openPosition['position_eod']
+
+                openPosition['ntcf_d_local'] += float( aggr_execs['ntcf_d_local'] )
+
+                found_in_daily_statement = True
+
+                break
+        if found_in_daily_statement == False and check_account == True:
+
+            list_openPositions.append({
+                'provider': 'IB', 
+                'provider_account': aggr_execs['execution_m_acctNumber'],
+                'strategy': "MULTI",
+                'position_current': aggr_execs['intraday_net_trading_qty'],
+                'pnl_d_local': 0,
+                'pnl_y_local': 0,
+                'pnl_y_eod_local': 0,
+                'position_eod': 0,
+                'price_eod': 0,
+                'ntcf_d_local': float( aggr_execs['ntcf_d_local'] ),
+                'Symbole': f'{aggr_execs["ibkr_underyling"]}/{aggr_execs["ibkr_symbol"]}',
+                'conid': int(aggr_execs['ibcontract_conid']),
+                'costBasisMoney_d_long': 0,
+                'costBasisMoney_d_short': 0,
+                'costBasisPrice_eod': 0,
+                'fifoPnlUnrealized_eod': 0,
+                'costBasisPrice_d': 0
+            })
+
+
+    '''
     current_executions = json.loads( routes_ibexecutionrestfuls.list_limit_date( dt_refExec.strftime("%Y-%m-%d") ).get_data() )
     current_app.logger.info(f'after retrieving today executions')
 
@@ -809,6 +863,8 @@ def ib_report_eod_v3_xls():
                 'fifoPnlUnrealized_eod': 0,
                 'costBasisPrice_d': ibexecutionrestful['execution_m_price'] / abs(ibexecutionrestful['execution_m_shares']) if ibexecutionrestful['execution_m_shares'] != 0 else 0
             })
+    '''
+    
 
 
     df_openPositions = pd.DataFrame(list_openPositions)
@@ -969,7 +1025,50 @@ def ib_report_eod_v3_xls_fast():
 
     current_app.logger.info(f'ib_report_eod_v2_xls:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
 
+    if 'account' in input_data:
+        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time > '{dt_refExec.strftime('%Y-%m-%d')}' AND execution_m_acctNumber = '{input_data['account']}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
+    else:
+        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time > '{dt_refExec.strftime('%Y-%m-%d')}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
+    current_app.logger.info(f'after retrieving today aggregate executions ')
 
+    for aggr_execs in aggr_executions:
+
+        if aggr_execs['execution_m_acctNumber'][-1] == 'F':
+            aggr_execs['execution_m_acctNumber'] = aggr_execs['execution_m_acctNumber'][:-1]
+        found_in_daily_statement = False
+        check_account = True
+
+        if 'account' in input_data:
+            if aggr_execs['execution_m_acctNumber'] == input_data["account"]:
+                check_account = True
+            else:
+                check_account = False
+        
+        for openPosition in list_openPositions:
+
+            if int(openPosition['conid']) == int(aggr_execs['ibcontract_conid']) and openPosition['provider_account'] == aggr_execs['execution_m_acctNumber']: # same asset & same account
+                openPosition['position_current'] += int(aggr_execs['intraday_net_trading_qty'])
+
+                openPosition['ntcf_d_local'] += float( aggr_execs['ntcf_d_local'] )
+
+                found_in_daily_statement = True
+
+                break
+        if found_in_daily_statement == False and check_account == True:
+
+            list_openPositions.append({
+                'provider': 'IB', 
+                'provider_account': aggr_execs['execution_m_acctNumber'],
+                'strategy': "MULTI",
+                'position_current': aggr_execs['intraday_net_trading_qty'],
+                'position_eod': 0, 
+                'price_eod': 0,
+                'ntcf_d_local': float( aggr_execs['ntcf_d_local'] ),
+                'conid': int(aggr_execs['ibcontract_conid']),
+            })
+    
+
+    '''
     current_executions = json.loads( routes_ibexecutionrestfuls.list_limit_date( dt_refExec.strftime("%Y-%m-%d") ).get_data() )
     current_app.logger.info(f'after retrieving today executions')
 
@@ -1012,6 +1111,8 @@ def ib_report_eod_v3_xls_fast():
                 'conid': ibexecutionrestful['contract_m_conId'],
 
             })
+    '''
+    
 
 
     df_openPositions = pd.DataFrame(list_openPositions)

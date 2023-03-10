@@ -285,6 +285,8 @@ def check_new_assets():
 
     df['bbgTicker_strike'] = df.ticker.str.extract(r'\s[PpCp]([\d\.]+)')
     df['bbgTicker_strike'] = pd.to_numeric(df['bbgTicker_strike'])
+
+    
     
     h_options = ['ibcontract_conid', 'ibcontract_symbol', 'ibcontract_currency', 'ibcontract_putCall', 'ticker', 'ibExpiryPart', 'bbgTicker_expiry', 'ibcontract_strike', 'bbgTicker_strike', 'bbgTicker_putCall']
     
