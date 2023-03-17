@@ -1141,6 +1141,8 @@ def ib_report_eod_v3_xls_fast():
     # new fields
     df_openPositions['CUSTOM_accpbpid'] = [f'MULTI_IB_{Identifier}' for Identifier in df_openPositions['Identifier'] ]
 
+    # avoid mix stock/cfd
+    df_openPositions = df_openPositions.drop_duplicates(subset=['bbg_ticker'], keep=False)
 
     # subset with trading only
     df_openPositions = df_openPositions[ (df_openPositions['ntcf_d_local'] !=0) | (df_openPositions['position_current'] != df_openPositions['position_eod']) ]
