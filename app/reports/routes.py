@@ -263,7 +263,7 @@ def ib_upload_eod_report_tokens():
 
     # --- retrieve raw report from IBKR through FlexQuery service, merge everything into one single big report ---
     for fq in data["flexQueries"]:
-        current_app.logger.info(f'processing {fq["queryId"]}')
+        current_app.logger.info(f'ib_upload_eod_report_tokens:: processing {fq["queryId"]}')
 
         QUERY_ID = fq["queryId"]
         TOKEN = fq["token"]
@@ -325,6 +325,12 @@ def ib_upload_eod_report_tokens():
         # open positions
         df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
 
+
+        res_df = json.loads( ib_process_eod_report_tokens_post_open_parquet().get_data() )
+        df_openPositions_parquet = pd.DataFrame( res_df['data'] )
+        df_openPositions_parquet = df_openPositions_parquet.astype(object).where((pd.notnull(df_openPositions_parquet)), None)
+
+        '''
         df_openPositions_parquet = df_for_parquet(df_openPositions, dm_openPosition)
         df_openPositions_parquet.to_parquet(
             os.path.join(SCRIPT_ROOT + '/data/', 'ibkr_OpenPositions.parquet.gzip'), 
@@ -333,8 +339,9 @@ def ib_upload_eod_report_tokens():
             index=False, 
             flavor='spark'
         )
-        current_app.logger.info(f'ib_upload_eod_report_v2:: save OpenPositions as parquet')
-
+        current_app.logger.info(f'ib_upload_eod_report_tokens:: save OpenPositions as parquet')
+        '''
+        
         # update Ibcontract
         list_ibcontractsToCheck = []
         fields_Ibcontract = ['assetCategory', 'symbol', 'description', 'conid', 'isin', 'listingExchange', 'underlyingConid', 'underlyingSymbol', 'underlyingSecurityID', 'underlyingListingExchange', 'multiplier', 'strike', 'expiry', 'putCall', 'maturity', 'issueDate', 'underlyingCategory', 'subCategory', 'currency']
@@ -346,13 +353,20 @@ def ib_upload_eod_report_tokens():
                     api_Ibcontract[key_Ibcontract] = position[key_Ibcontract]
             list_ibcontractsToCheck.append(api_Ibcontract)
 
-        current_app.logger.info(f'ib_upload_eod_report_v2:: check ibcontracts OpenPositions')
-        current_app.logger.info( f'ib_upload_eod_report_v2:: new assets from OpenPositions: {json.loads(routes_ibcontract.ibcontracts_insert_many(list_ibcontractsToCheck).data)["newAssets_count"]}' )
+        current_app.logger.info(f'ib_upload_eod_report_tokens:: check ibcontracts OpenPositions')
+        current_app.logger.info( f'ib_upload_eod_report_tokens:: new assets from OpenPositions: {json.loads(routes_ibcontract.ibcontracts_insert_many(list_ibcontractsToCheck).data)["newAssets_count"]}' )
 
 
         # create ibcontract from monthly perf
         df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
 
+
+        res_df = json.loads( ib_process_eod_report_tokens_post_mtdpnl_parquet ().get_data() )
+        df_MTDYTDPerformanceSummary_parquet = pd.DataFrame( res_df['data'] )
+        df_MTDYTDPerformanceSummary_parquet = df_MTDYTDPerformanceSummary_parquet.astype(object).where((pd.notnull(df_MTDYTDPerformanceSummary_parquet)), None)
+
+
+        '''
         df_MTDYTDPerformanceSummary_parquet = df_for_parquet(df_MTDYTDPerformanceSummary[ df_MTDYTDPerformanceSummary['mtmMTD'] != 0 ], dm_pnlMTD)
         df_MTDYTDPerformanceSummary_parquet.to_parquet(
             os.path.join(SCRIPT_ROOT + '/data/', 'ibkr_MTDYTDPerformanceSummary.parquet.gzip'), 
@@ -361,7 +375,9 @@ def ib_upload_eod_report_tokens():
             index=False, 
             flavor='spark'
         )
-        current_app.logger.info(f'ib_upload_eod_report_v2:: save MTDYTDPerformanceSummary as parquet')
+        current_app.logger.info(f'ib_upload_eod_report_tokens:: save MTDYTDPerformanceSummary as parquet')
+        '''
+        
 
         dict_positions = {}
         mtd_pnl = []
@@ -376,13 +392,13 @@ def ib_upload_eod_report_tokens():
             mtd_pnl.append(dict_positions[position])
         df_MTDYTDPerformanceSummary = pd.DataFrame(mtd_pnl)
 
-        current_app.logger.info(f'ib_upload_eod_report_v2:: check ibcontracts MTDYTDPerformanceSummary')
-        current_app.logger.info( f'ib_upload_eod_report_v2:: new asset from MTDYTDPerformanceSummary: {json.loads(routes_ibcontract.ibcontracts_insert_many(mtd_pnl).data)["newAssets_count"]}' )
+        current_app.logger.info(f'ib_upload_eod_report_tokens:: check ibcontracts MTDYTDPerformanceSummary')
+        current_app.logger.info( f'ib_upload_eod_report_tokens:: new asset from MTDYTDPerformanceSummary: {json.loads(routes_ibcontract.ibcontracts_insert_many(mtd_pnl).data)["newAssets_count"]}' )
 
 
 
         # clean former execs
-        current_app.logger.info(f'ib_upload_eod_report_v2:: clean former executions pool before {reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}')
+        current_app.logger.info(f'ib_upload_eod_report_tokens:: clean former executions pool before {reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}')
         db.session.query(Ibexecutionrestful).filter(Ibexecutionrestful.execution_m_time <= f'{reportDate_str[:4]}-{reportDate_str[4:6]}-{reportDate_str[6:]}' ).delete()
         db.session.commit()
 
@@ -391,6 +407,73 @@ def ib_upload_eod_report_tokens():
     else:
         return jsonify( {'status': 'error', 'error': 'flex query report is invalid', 'controller': 'reports'} )
 
+
+
+@bp.route('/reports/ib/eod/tokens/post/open/parquet', methods=['POST'])
+def ib_process_eod_report_tokens_post_open_parquet():
+
+    with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST)) as fd:
+        doc = xmltodict.parse(fd.read())
+
+
+    if 'FlexQueryResponse' in doc:
+
+        df_openPositions = ib_fq_dailyStatement_OpenPositions(doc)
+
+        df_openPositions_parquet = df_for_parquet(df_openPositions, dm_openPosition)
+        df_openPositions_parquet.to_parquet(
+            os.path.join(SCRIPT_ROOT + '/data/', 'ibkr_OpenPositions.parquet.gzip'), 
+            engine='pyarrow', 
+            compression='gzip',
+            index=False, 
+            flavor='spark'
+        )
+        current_app.logger.info(f'ib_process_eod_report_tokens_post_open_parquet:: save OpenPositions as parquet')
+
+        df_openPositions = df_openPositions.astype(object).where((pd.notnull(df_openPositions)), None)
+
+        return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_openPositions), 'data': df_openPositions.to_dict(orient='records') } )
+
+
+@bp.route('/reports/ib/eod/tokens/post/mtdpnl/parquet', methods=['POST'])
+def ib_process_eod_report_tokens_post_mtdpnl_parquet():
+
+    with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST)) as fd:
+        doc = xmltodict.parse(fd.read())
+
+
+    if 'FlexQueryResponse' in doc:
+
+        df_MTDYTDPerformanceSummary = ib_fq_dailyStatement_MTDYTDPerformanceSummary(doc)
+
+        df_MTDYTDPerformanceSummary_parquet = df_for_parquet(df_MTDYTDPerformanceSummary[ df_MTDYTDPerformanceSummary['mtmMTD'] != 0 ], dm_pnlMTD)
+        df_MTDYTDPerformanceSummary_parquet.to_parquet(
+            os.path.join(SCRIPT_ROOT + '/data/', 'ibkr_MTDYTDPerformanceSummary.parquet.gzip'), 
+            engine='pyarrow', 
+            compression='gzip',
+            index=False, 
+            flavor='spark'
+        )
+        current_app.logger.info(f'ib_process_eod_report_tokens_post_mtdpnl_parquet:: save MTDYTDPerformanceSummary as parquet')
+
+        df_MTDYTDPerformanceSummary = df_MTDYTDPerformanceSummary.astype(object).where((pd.notnull(df_MTDYTDPerformanceSummary)), None)
+
+        return jsonify( {'status': 'ok', 'controller': 'reports', 'positionsCount': len(df_MTDYTDPerformanceSummary), 'data': df_MTDYTDPerformanceSummary.to_dict(orient='records') } )
+
+
+@bp.route('/reports/ib/eod/tokens/post/parquet', methods=['POST'])
+def ib_process_eod_report_tokens_post_parquet():
+
+    res = json.loads( ib_process_eod_report_tokens_post_open_parquet().get_data() )
+    df_openPositions = pd.DataFrame( res['data'] )
+    df_openPositions = df_openPositions.astype(object).where((pd.notnull(df_openPositions)), None)
+
+    res = json.loads( ib_process_eod_report_tokens_post_mtdpnl_parquet ().get_data() )
+    df_MTDYTDPerformanceSummary = pd.DataFrame( res['data'] )
+    df_MTDYTDPerformanceSummary = df_MTDYTDPerformanceSummary.astype(object).where((pd.notnull(df_MTDYTDPerformanceSummary)), None)
+
+    return jsonify( {'status': 'ok', 'controller': 'reports', 'open': df_openPositions.to_dict(orient='records'), 'mtdPnl': df_MTDYTDPerformanceSummary.to_dict(orient='records') } )
+    
 
 
 @bp.route('/reports/ib/eod/v2/xls', methods=['POST'])
@@ -798,75 +881,6 @@ def ib_report_eod_v3_xls():
             })
 
 
-    '''
-    current_executions = json.loads( routes_ibexecutionrestfuls.list_limit_date( dt_refExec.strftime("%Y-%m-%d") ).get_data() )
-    current_app.logger.info(f'after retrieving today executions')
-
-    for ibexecutionrestful_execution_m_execId in current_executions['executions']: #dict
-
-        ibexecutionrestful = current_executions['executions'][ibexecutionrestful_execution_m_execId]
-
-        if ibexecutionrestful['execution_m_acctNumber'][-1] == 'F':
-            ibexecutionrestful['execution_m_acctNumber'] = ibexecutionrestful['execution_m_acctNumber'][:-1]
-        found_in_daily_statement = False
-        check_account = True
-
-        if 'account' in input_data:
-            if ibexecutionrestful['execution_m_acctNumber'] == input_data["account"]:
-                check_account = True
-            else:
-                check_account = False
-
-
-        for openPosition in list_openPositions:
-
-            if openPosition['conid'] == ibexecutionrestful['contract_m_conId'] and openPosition['provider_account'] == ibexecutionrestful['execution_m_acctNumber']: # same asset & same account
-                openPosition['position_current'] += ibexecutionrestful['execution_m_shares']
-
-                openPosition['position_d_chg'] = openPosition['position_current'] - openPosition['position_eod']
-
-                openPosition['ntcf_d_local'] -= ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier']
-
-                openPosition['costBasisMoney_d_long'] += ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] > 0 else 0
-
-                openPosition['costBasisMoney_d_short'] += ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] < 0 else 0
-
-                if openPosition['position_d_chg'] == 0:
-                    openPosition['costBasisPrice_d'] = 0
-                elif openPosition['position_d_chg'] > 0:
-                    openPosition['costBasisPrice_d'] = ( openPosition['costBasisMoney_d_long'] + openPosition['costBasisMoney_d_short'] ) / openPosition['position_d_chg']
-                elif openPosition['position_d_chg'] < 0:
-                    openPosition['costBasisPrice_d'] = ( openPosition['costBasisMoney_d_short'] + openPosition['costBasisMoney_d_long'] ) / openPosition['position_d_chg']
-
-
-                found_in_daily_statement = True
-                break
-
-        if found_in_daily_statement == False and check_account == True:
-
-            list_openPositions.append({
-                'provider': 'IB', 
-                'provider_account': ibexecutionrestful['execution_m_acctNumber'],
-                'strategy': "MULTI",
-                'position_current': ibexecutionrestful['execution_m_shares'],
-                'pnl_d_local': 0,
-                'pnl_y_local': 0,
-                'pnl_y_eod_local': 0,
-                'position_eod': 0,
-                'price_eod': 0,
-                'ntcf_d_local': -1 * ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
-                'Symbole': f'{ibexecutionrestful["contract_m_symbol"]}/{ibexecutionrestful["contract_m_localSymbol"]}',
-                'conid': ibexecutionrestful['contract_m_conId'],
-                'costBasisMoney_d_long': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] > 0 else 0,
-                'costBasisMoney_d_short': ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] if ibexecutionrestful['execution_m_shares'] < 0 else 0,
-                'costBasisPrice_eod': 0,
-                'fifoPnlUnrealized_eod': 0,
-                'costBasisPrice_d': ibexecutionrestful['execution_m_price'] / abs(ibexecutionrestful['execution_m_shares']) if ibexecutionrestful['execution_m_shares'] != 0 else 0
-            })
-    '''
-    
-
-
     df_openPositions = pd.DataFrame(list_openPositions)
 
     current_app.logger.info(f'after merging open positions with intraday executions, positions: {len(df_openPositions)}')    
@@ -1067,53 +1081,6 @@ def ib_report_eod_v3_xls_fast():
                 'conid': int(aggr_execs['ibcontract_conid']),
             })
     
-
-    '''
-    current_executions = json.loads( routes_ibexecutionrestfuls.list_limit_date( dt_refExec.strftime("%Y-%m-%d") ).get_data() )
-    current_app.logger.info(f'after retrieving today executions')
-
-    for ibexecutionrestful_execution_m_execId in current_executions['executions']: #dict
-
-        ibexecutionrestful = current_executions['executions'][ibexecutionrestful_execution_m_execId]
-
-        if ibexecutionrestful['execution_m_acctNumber'][-1] == 'F':
-            ibexecutionrestful['execution_m_acctNumber'] = ibexecutionrestful['execution_m_acctNumber'][:-1]
-
-        found_in_daily_statement = False
-        check_account = True
-
-        if 'account' in input_data:
-            if ibexecutionrestful['execution_m_acctNumber'] == input_data["account"]:
-                check_account = True
-            else:
-                check_account = False
-
-        for openPosition in list_openPositions:
-
-            if openPosition['conid'] == ibexecutionrestful['contract_m_conId'] and openPosition['provider_account'] == ibexecutionrestful['execution_m_acctNumber']: # same asset & same account
-                openPosition['position_current'] += ibexecutionrestful['execution_m_shares']
-
-                openPosition['ntcf_d_local'] -= ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier']
-
-
-                found_in_daily_statement = True
-                break
-
-        if found_in_daily_statement == False and check_account == True:
-
-            list_openPositions.append({
-                'provider': 'IB', 
-                'provider_account': ibexecutionrestful['execution_m_acctNumber'],
-                'strategy': "MULTI",
-                'position_current': ibexecutionrestful['execution_m_shares'], 
-                'position_eod': 0,
-                'ntcf_d_local': -1 * ibexecutionrestful['execution_m_shares'] * ibexecutionrestful['execution_m_price'] * ibexecutionrestful['contract_m_multiplier'] ,
-                'conid': ibexecutionrestful['contract_m_conId'],
-
-            })
-    '''
-    
-
 
     df_openPositions = pd.DataFrame(list_openPositions)
 
