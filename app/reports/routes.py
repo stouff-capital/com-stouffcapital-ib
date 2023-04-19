@@ -828,9 +828,9 @@ def ib_report_eod_v3_xls():
     current_app.logger.info(f'ib_report_eod_v2_xls:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
 
     if 'account' in input_data:
-        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time > '{dt_refExec.strftime('%Y-%m-%d')}' AND execution_m_acctNumber = '{input_data['account']}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
+        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time >= '{dt_refExec.strftime('%Y-%m-%d')}' AND execution_m_acctNumber = '{input_data['account']}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
     else:
-        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time > '{dt_refExec.strftime('%Y-%m-%d')}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
+        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time >= '{dt_refExec.strftime('%Y-%m-%d')}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
     current_app.logger.info(f'after retrieving today aggregate executions ')
 
     for aggr_execs in aggr_executions:
@@ -1040,9 +1040,9 @@ def ib_report_eod_v3_xls_fast():
     current_app.logger.info(f'ib_report_eod_v2_xls:: check refDate for executions {dt_refExec.strftime("%Y-%m-%d")}')
 
     if 'account' in input_data:
-        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time > '{dt_refExec.strftime('%Y-%m-%d')}' AND execution_m_acctNumber = '{input_data['account']}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
+        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time >= '{dt_refExec.strftime('%Y-%m-%d')}' AND execution_m_acctNumber = '{input_data['account']}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
     else:
-        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time > '{dt_refExec.strftime('%Y-%m-%d')}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
+        aggr_executions = db.session.execute( f"SELECT execution_m_acctNumber, ibcontract_conid, contract_m_symbol AS ibkr_underyling, contract_m_localSymbol AS ibkr_symbol, SUM( execution_m_shares ) AS intraday_net_trading_qty, SUM( -1 * execution_m_shares * execution_m_price * contract_m_multiplier ) AS ntcf_d_local FROM ibexecutionrestful WHERE execution_m_time >= '{dt_refExec.strftime('%Y-%m-%d')}' GROUP BY execution_m_acctNumber, ibcontract_conid" )
     current_app.logger.info(f'after retrieving today aggregate executions ')
 
     for aggr_execs in aggr_executions:
