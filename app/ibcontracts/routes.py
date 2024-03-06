@@ -50,7 +50,9 @@ def ibcontract_create_one(data):
         std_fields = [ 'assetCategory', 'symbol', 'description', 'isin', 'listingExchange', 'underlyingSymbol', 'underlyingSecurityID', 'underlyingListingExchange', 'putCall', 'underlyingCategory', 'subCategory', 'currency' ]
         for std_field in std_fields:
             if std_field in data:
-                if data[std_field] != '':
+                if data[std_field] is None or str(data[std_field]) == 'None' or str(data[std_field]) == 'nan':
+                    pass
+                elif data[std_field] != '':
                     setattr(ibcontract, std_field, data[std_field])
 
         # numeric fields
@@ -58,8 +60,11 @@ def ibcontract_create_one(data):
         for std_field in std_fields:
             if std_field in data:
                 if data[std_field] != '':
-                    data[std_field] = int(data[std_field])
-                    setattr(ibcontract, std_field, data[std_field])
+                    try:
+                        data[std_field] = int(data[std_field])
+                        setattr(ibcontract, std_field, data[std_field])
+                    except:
+                        pass
 
         std_fields = [ 'multiplier' ]
         for std_field in std_fields:
@@ -72,12 +77,16 @@ def ibcontract_create_one(data):
         std_fields = [ 'expiry', 'maturity', 'issueDate' ]
         for std_field in std_fields:
             if std_field in data:
-                if data[std_field] != '':
+                if data[std_field] is None or str(data[std_field]) == 'None' or str(data[std_field]) == 'nan':
+                    pass
+                elif data[std_field] != '':
+
                     if len(data[std_field]) == 8:
                         date_format = '%Y%m%d'
                     elif len(data[std_field]) == 10:
                         date_format = '%Y-%m-%d'
                     setattr(ibcontract, std_field, datetime.strptime(data[std_field], date_format) )
+
 
         db.session.add(ibcontract)
         try:

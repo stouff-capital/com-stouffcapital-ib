@@ -17,11 +17,11 @@
 
 ## container backend
 
-`docker build -t gchevalley/com-stouffcapital-ib .`
+`docker build -t stouffcapital/com-stouffcapital-ib .`
 
-`docker run --name com-stouffcapital-ib -p 5000:5000 -e "MYSQL_PASSWORD=<mysqlPassword>" -e "BASIC_AUTH_USERNAME=<user>" -e "BASIC_AUTH_PASSWORD=<password>" --link ib-mysql:ib-mysql gchevalley/com-stouffcapital-ib`
+`docker run --name com-stouffcapital-ib -p 5000:5000 -e "MYSQL_PASSWORD=<mysqlPassword>" -e "BASIC_AUTH_USERNAME=<user>" -e "BASIC_AUTH_PASSWORD=<password>" --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`
 
-`docker run -it --rm --name com-stouffcapital-ib -p 5000:5000 --env-file=.env --link ib-mysql:ib-mysql gchevalley/com-stouffcapital-ib`
+`docker run -it --rm --name com-stouffcapital-ib -p 5000:5000 --env-file=.docker.env --link ib-mysql:ib-mysql stouffcapital/com-stouffcapital-ib`
 
 ## Creating The Migration Repository
 
@@ -72,11 +72,15 @@ End Function
 1. `kubectl -n ib create secret generic ib --from-literal=mysql-password=<pass> --from-literal=backend-user=<user> --from-literal=backend-password=<pass> --from-literal=sentry-sdk=<sentry_sdk>`
 1. `kubectl create -f deploy/kubernetes/ib-db-pvc.yaml`
 1. `kubectl create -f deploy/kubernetes/ib-sa.yaml`
+1. `kubectl create -f deploy/kubernetes/serviceaccount-secret.yaml`
+1. `kubectl create -f deploy/kubernetes/ib-role.yaml`
 1. `kubectl create -f deploy/kubernetes/ib-rolebinding.yaml`
 1. `kubectl create -f deploy/kubernetes/ib-backend-pvc.yaml`
 1. `kubectl create -f deploy/kubernetes/ib-mysql.yaml`
 1. `kubectl create -f deploy/kubernetes/ib-backend.yaml`
 1. `kubectl create -f deploy/kubernetes/com-stouffcapital-ib-ing-ssl.yaml`
+
+update com-stouffcapital-ib/k8s vault secret
 
 ## restore db from mysql pod
 

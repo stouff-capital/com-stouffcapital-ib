@@ -1,6 +1,6 @@
 alembic
 dateparser
-Flask
+Flask==2.1.3
 Flask-AlchemyDumps
 Flask-BasicAuth
 Flask-Migrate
@@ -15,4 +15,5 @@ python-dotenv
 requests
 sentry-sdk[flask]==0.5.3
 SQLAlchemy<2.0
+Werkzeug==2.2.2
 xmltodict

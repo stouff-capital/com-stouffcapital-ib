@@ -83,6 +83,7 @@ celerybeat-schedule
 
 # Environments
 .env
+.docker.env
 .venv
 env/
 venv/
@@ -111,5 +112,6 @@ com-stouffcapital-ib.log*
 app/reports/data/*.csv
 app/reports/data/*.xml
 app/reports/data/*.gz
+app/reports/data/*.gzip
 
 alchemydumps-backup/*.gz
