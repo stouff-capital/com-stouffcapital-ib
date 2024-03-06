@@ -15,5 +15,5 @@ python-dotenv
 requests
 sentry-sdk[flask]==0.5.3
 SQLAlchemy<2.0
-Werkzeug==2.2.2
+Werkzeug==2.3.8
 xmltodict
