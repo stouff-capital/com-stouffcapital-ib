@@ -210,11 +210,13 @@ dm_openPosition = [
     {'field': 'provider', 'parquetDatatype': 'VARCHAR'}, 
     {'field': 'provider_account', 'parquetDatatype': 'VARCHAR'}, 
     {'field': 'strategy', 'parquetDatatype': 'VARCHAR'}, 
-    {'field': 'position_current', 'parquetDatatype': 'BIGINT'}, 
+    #{'field': 'position_current', 'parquetDatatype': 'BIGINT'}, 
+    {'field': 'position_current', 'parquetDatatype': 'DOUBLE'},
     {'field': 'pnl_d_local', 'parquetDatatype': 'DOUBLE'}, 
     {'field': 'pnl_y_local', 'parquetDatatype': 'DOUBLE'}, 
     {'field': 'pnl_y_eod_local', 'parquetDatatype': 'DOUBLE'}, 
-    {'field': 'position_eod', 'parquetDatatype': 'BIGINT'}, 
+    #{'field': 'position_eod', 'parquetDatatype': 'BIGINT'}, 
+    {'field': 'position_eod', 'parquetDatatype': 'DOUBLE'}, 
     {'field': 'position_d_chg', 'parquetDatatype': 'BIGINT'}, 
     {'field': 'price_eod', 'parquetDatatype': 'DOUBLE'}, 
     {'field': 'ntcf_d_local', 'parquetDatatype': 'DOUBLE'}, 
@@ -1284,8 +1286,8 @@ def ib_fq_dailyStatement_OpenPositions(doc):
             else:
                 list_OpenPositions = [ FlexStatement['OpenPositions']['OpenPosition'] ]
 
-        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'positionValue', 'percentOfNAV', 'costBasisMoney', 'costBasisPrice', 'fifoPnlUnrealized', 'multiplier']
-        intfields_OpenPosition = ['conid', 'position']
+        floatfields_OpenPosition = ['fxRateToBase', 'strike', 'markPrice', 'position', 'positionValue', 'percentOfNAV', 'costBasisMoney', 'costBasisPrice', 'fifoPnlUnrealized', 'multiplier']
+        intfields_OpenPosition = ['conid']
         datefields_OpenPosition = ['reportDate']
 
 

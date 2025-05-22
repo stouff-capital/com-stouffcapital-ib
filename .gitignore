@@ -84,6 +84,7 @@ celerybeat-schedule
 # Environments
 .env
 .docker.env
+.podman.env
 .venv
 env/
 venv/
