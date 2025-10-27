@@ -18,7 +18,7 @@
 
 `docker run --name ib-myadmin -d --link ib-mysql:db -p 8080:80 phpmyadmin/phpmyadmin`
 
-`podman run --name ib-myadmin -d --net com-stouffcapital-ib --network-alias com-stouffcapital-ib -e "PMA_ARBITRARY=1" -e "UPLOAD_LIMIT=50M" -p 8080:80 phpmyadmin/phpmyadmin`
+`podman run --name ib-myadmin -d --net com-stouffcapital-ib --network-alias com-stouffcapital-ib -e "PMA_HOST=ib-mysql" -e "UPLOAD_LIMIT=50M" -p 8080:80 phpmyadmin/phpmyadmin`
 
 ## container backend
 

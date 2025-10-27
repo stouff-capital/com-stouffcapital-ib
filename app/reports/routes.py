@@ -217,7 +217,8 @@ dm_openPosition = [
     {'field': 'pnl_y_eod_local', 'parquetDatatype': 'DOUBLE'}, 
     #{'field': 'position_eod', 'parquetDatatype': 'BIGINT'}, 
     {'field': 'position_eod', 'parquetDatatype': 'DOUBLE'}, 
-    {'field': 'position_d_chg', 'parquetDatatype': 'BIGINT'}, 
+    #{'field': 'position_d_chg', 'parquetDatatype': 'BIGINT'}, 
+    {'field': 'position_d_chg', 'parquetDatatype': 'DOUBLE'}, 
     {'field': 'price_eod', 'parquetDatatype': 'DOUBLE'}, 
     {'field': 'ntcf_d_local', 'parquetDatatype': 'DOUBLE'}, 
     {'field': 'Symbole', 'parquetDatatype': 'VARCHAR'}, 
@@ -267,52 +268,85 @@ def ib_upload_eod_report_tokens():
     for fq in data["flexQueries"]:
         current_app.logger.info(f'ib_upload_eod_report_tokens:: processing {fq["queryId"]}')
 
-        QUERY_ID = fq["queryId"]
-        TOKEN = fq["token"]
-        VERSION = '3'
+        FLEX_VERSION = '3'
 
-        res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest?t={TOKEN}&q={QUERY_ID}&v={VERSION}')
+        send_params = {
+            "t": fq["token"], 
+            "q": fq["queryId"], 
+            "v": FLEX_VERSION, 
+        }
 
-        doc = xmltodict.parse(res.content)
+        requestBase = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService"
 
-        if doc['FlexStatementResponse']['Status'] == 'Success':
-            REFERENCE_CODE = doc['FlexStatementResponse']['ReferenceCode']
+        res_SendRequest = requests.get(
+            url=f'{requestBase}/SendRequest', 
+            params=send_params
+        )
 
-            res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?q={REFERENCE_CODE}&t={TOKEN}&v={VERSION}')
+        with open('FlexStatementResponse.xml', 'w') as file:
+            file.write(res_SendRequest.text) # debug purpose
 
-            root =  ET.fromstring( res.content )
+        tree_response = ET.parse('FlexStatementResponse.xml')
+        root_response = tree_response.getroot()
 
-            dnl_report_try = 0
-            dnl_report_retry = 6
-            while root.tag == 'FlexStatementResponse' and root.find("Status").text == 'Warn' and dnl_report_try < dnl_report_retry:
+        if root_response.tag == 'FlexStatementResponse':
+            if root_response.find('Status').text == 'Success':
 
-                if root.find("ErrorCode").text == '1019':
-                    current_app.logger.info(f'flex query {QUERY_ID} report not yet ready... please wait {dnl_report_try+1}')
-                    time.sleep(10)
-                    res = requests.get(f'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement?q={REFERENCE_CODE}&t={TOKEN}&v={VERSION}')
-                    root =  ET.fromstring( res.content )
-                    dnl_report_try += 1
+                # second call pour le rapatriement effectif du rapport
+                REFERENCE_CODE = root_response.find('ReferenceCode').text
 
-                    if dnl_report_try == dnl_report_retry:
-                        return jsonify( {'status': 'error', 'error': 'report not ready', 'controller': 'reports'} )
-            
-            with open(os.path.join(SCRIPT_ROOT + '/data/', f'{QUERY_ID}.xml'), 'wb') as file:
-                file.write( ET.tostring(root) )
-            
-            if xml is None:
-                xml = root
+                receive_params = {
+                    "t": fq["token"], 
+                    "q": REFERENCE_CODE, 
+                    "v": FLEX_VERSION
+                }
+
+                res_getStatement = requests.get(
+                    f'{requestBase}/GetStatement', 
+                    params=receive_params, 
+                    allow_redirects=True
+                )
+
+                with open(os.path.join(SCRIPT_ROOT + '/data/', f'{fq["queryId"]}.xml'), 'w') as file:
+                    file.write(res_getStatement.text)
+                tree_report = ET.parse( os.path.join(SCRIPT_ROOT + '/data/', f'{fq["queryId"]}.xml') )
+                root_report = tree_report.getroot()
+
+                dnl_report_try = 0
+                dnl_report_retry = 6
+                while root_report.tag == 'FlexStatementResponse' and root_report.find('Status').text == 'Warn' and dnl_report_try < dnl_report_retry:
+                    if root_report.find('ErrorCode').text == '1019':
+                        current_app.logger.info(f'flex query {fq["queryId"]} report not yet ready... please wait {dnl_report_try+1}')
+                        time.sleep(10)
+                        res_getStatement = requests.get(
+                            f'{requestBase}/GetStatement', 
+                            params=receive_params, 
+                            allow_redirects=True
+                        )
+                        with open(os.path.join(SCRIPT_ROOT + '/data/', f'{fq["queryId"]}.xml'), 'w') as file:
+                            file.write(res_getStatement.text)
+                        tree_report = ET.parse( os.path.join(SCRIPT_ROOT + '/data/', f'{fq["queryId"]}.xml') )
+                        root_report = tree_report.getroot()
+                        dnl_report_try += 1
+
+                        if dnl_report_try == dnl_report_retry:
+                            return jsonify( {'status': 'error', 'error': 'report not ready', 'controller': 'reports'} )
+                        
+                if xml is None:
+                    xml = root_report
+                else:
+                    FlexStatements = xml.find("FlexStatements") # only one
+
+                    for FlexStatement in root_report.iter('FlexStatement'):
+                        FlexStatements.append(FlexStatement)
+                
+                with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'wb') as file:
+                    file.write( ET.tostring(xml) )
+
             else:
-                FlexStatements = xml.find("FlexStatements") # only one
+                current_app.logger.info(res_SendRequest.text)
+                return jsonify( {'status': 'error', 'error': f'unable to retrieve flex query {fq["queryId"]}', 'controller': 'reports'} )
 
-                for FlexStatement in root.iter('FlexStatement'):
-                    FlexStatements.append(FlexStatement)
-            
-            with open(os.path.join(SCRIPT_ROOT + '/data/', IB_FQ_LAST), 'wb') as file:
-                file.write( ET.tostring(xml) )
-        
-        else:
-            print(doc)
-            return jsonify( {'status': 'error', 'error': f'unable to retrieve flex query {QUERY_ID}', 'controller': 'reports'} )
 
             
     # --- post processing ---
